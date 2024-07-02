@@ -47,9 +47,10 @@ namespace _internal
     template <typename T>
     CDF_WARN_UNUSED_RESULT no_init_vector<char> impl_deflate(const T& input)
     {
-        no_init_vector<char> result(ZSTD_compressBound(std::size(input)));
-        const auto ret
-            = ZSTD_compress(result.data(), result.size(), input.data(), std::size(input), 1);
+        const auto input_bytes = std::size(input) * sizeof(decltype(*input.data()));
+        no_init_vector<char> result(ZSTD_compressBound(input_bytes));
+        const auto ret = ZSTD_compress(result.data(), result.size(),
+            reinterpret_cast<const char* const>(input.data()), input_bytes, 3);
         if (ret != ZSTD_isError(ret))
         {
             result.resize(ret);

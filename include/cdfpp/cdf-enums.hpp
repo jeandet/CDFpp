@@ -92,6 +92,10 @@ enum class cdf_compression_type : int32_t
     gzip_compression = 5,
 #ifdef CDFPP_USE_ZSTD
     zstd_compression = 16,
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+    delta_plus_zstd_compression = 16 + 32,
+    float_zstd_compression = 16 + 64,
+#endif
 #endif
 };
 
@@ -114,6 +118,19 @@ enum class cdf_compression_type : int32_t
         case cdf_compression_type::gzip_compression:
             return "GNU GZIP";
             break;
+#ifdef CDFPP_USE_ZSTD
+        case cdf_compression_type::zstd_compression:
+            return "Zstandard";
+            break;
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+        case cdf_compression_type::delta_plus_zstd_compression:
+            return "Delta + Zstandard";
+            break;
+        case cdf_compression_type::float_zstd_compression:
+            return "Float optimized Zstandard";
+            break;
+#endif
+#endif
         default:
             break;
     }
@@ -346,4 +363,23 @@ constexpr CDF_Types to_cdf_type()
 
 template <CDF_Types type>
 using from_cdf_type_t = decltype(from_cdf_type<type>());
+
+static inline bool is_floating_point(const CDF_Types type)
+{
+    if (type == CDF_Types::CDF_FLOAT || type == CDF_Types::CDF_DOUBLE
+        || type == CDF_Types::CDF_REAL4 || type == CDF_Types::CDF_REAL8)
+        return true;
+    return false;
+}
+
+static inline bool is_integral(const CDF_Types type)
+{
+    if (type == CDF_Types::CDF_BYTE || type == CDF_Types::CDF_INT1 || type == CDF_Types::CDF_INT2
+        || type == CDF_Types::CDF_INT4 || type == CDF_Types::CDF_INT8
+        || type == CDF_Types::CDF_UINT1 || type == CDF_Types::CDF_UINT2
+        || type == CDF_Types::CDF_UINT4 || type == CDF_Types::CDF_TIME_TT2000)
+        return true;
+    return false;
+}
+
 }

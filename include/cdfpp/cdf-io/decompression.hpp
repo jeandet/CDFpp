@@ -31,6 +31,9 @@
 #endif
 #ifdef CDFPP_USE_ZSTD
 #include "./zstd.hpp"
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+#include "experimental_compression.hpp"
+#endif
 #endif
 
 #include "./rle.hpp"
@@ -55,8 +58,21 @@ std::size_t gzinflate(const T& input, char* output, const std::size_t output_siz
 }
 
 template <cdf_compression_type type, typename T>
-std::size_t inflate(const T& input, char* output, const std::size_t output_size)
+std::size_t inflate(const T& input, char* output, const std::size_t output_size,
+    const CDF_Types cdf_type = CDF_Types::CDF_BYTE, const std::size_t record_size = 1)
 {
+    static_assert(type == cdf_compression_type::gzip_compression
+            || type == cdf_compression_type::rle_compression
+#ifdef CDFPP_USE_ZSTD
+            || type == cdf_compression_type::zstd_compression
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+            || type == cdf_compression_type::delta_plus_zstd_compression
+            || type == cdf_compression_type::float_zstd_compression
+#endif
+#endif
+        ,
+        "Invalid compression type");
+
     if constexpr (type == cdf_compression_type::gzip_compression)
         return gzinflate(input, output, output_size);
     if constexpr (type == cdf_compression_type::rle_compression)
@@ -64,13 +80,21 @@ std::size_t inflate(const T& input, char* output, const std::size_t output_size)
 #ifdef CDFPP_USE_ZSTD
     if constexpr (type == cdf_compression_type::zstd_compression)
         return zstd::inflate(input, output, output_size);
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+    if constexpr (type == cdf_compression_type::delta_plus_zstd_compression)
+        return experimental_compression::delta_zstd::inflate(input, output, output_size, cdf_type);
+    if constexpr (type == cdf_compression_type::float_zstd_compression)
+        return experimental_compression::float_zstd::inflate(
+            input, output, output_size, cdf_type, record_size);
+#endif
 #endif
     throw std::runtime_error("Unknown compression type.");
 }
 
 template <typename T>
-std::size_t inflate(
-    cdf_compression_type type, const T& input, char* output, const std::size_t output_size)
+std::size_t inflate(cdf_compression_type type, const T& input, char* output,
+    const std::size_t output_size, const CDF_Types cdf_type = CDF_Types::CDF_BYTE,
+    const std::size_t record_size = 1)
 {
     if (type == cdf_compression_type::gzip_compression)
         return gzinflate(input, output, output_size);
@@ -79,8 +103,14 @@ std::size_t inflate(
 #ifdef CDFPP_USE_ZSTD
     if (type == cdf_compression_type::zstd_compression)
         return zstd::inflate(input, output, output_size);
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+    if (type == cdf_compression_type::delta_plus_zstd_compression)
+        return experimental_compression::delta_zstd::inflate(input, output, output_size, cdf_type);
+    if (type == cdf_compression_type::float_zstd_compression)
+        return experimental_compression::float_zstd::inflate(
+            input, output, output_size, cdf_type, record_size);
+#endif
 #endif
     throw std::runtime_error("Unknown compression type.");
 }
-
 }

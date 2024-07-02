@@ -118,6 +118,12 @@ if get_option('with_experimental_zstd')
     cdfpp_headers += files(
         'include/cdfpp/cdf-io/zstd.hpp'
     )
+    if get_option('with_experimental_compression')
+        add_project_arguments('-DCDFPP_USE_EXPERIMENTAL_COMPRESSION', language : ['cpp'])
+        cdfpp_headers += files(
+            'include/cdfpp/cdf-io/experimental_compression.hpp'
+        )
+    endif
 else
     zstd_dep = declare_dependency()
 endif
@@ -151,17 +157,17 @@ cdfpp_extra_files = files(
 )
 
 cdfpp_doc_extra_files =  files(
-'docs/conf.py',
-'docs/Makefile',
-'docs/requirements.txt',
-'docs/index.rst',
-'docs/authors.rst',
-'docs/contributing.rst',
-'docs/history.rst',
-'docs/installation.rst',
-'docs/examples/index.rst',
-'docs/examples/Loading_CDF.ipynb',
-'docs/examples/Creating_CDF.ipynb'
+    'docs/conf.py',
+    'docs/Makefile',
+    'docs/requirements.txt',
+    'docs/index.rst',
+    'docs/authors.rst',
+    'docs/contributing.rst',
+    'docs/history.rst',
+    'docs/installation.rst',
+    'docs/examples/index.rst',
+    'docs/examples/Loading_CDF.ipynb',
+    'docs/examples/Creating_CDF.ipynb'
 )
 
 cdfpp_dep_inc = include_directories('include', '.')
@@ -253,7 +259,8 @@ if get_option('with_tests')
 
 
     foreach test:['endianness','simple_open', 'majority', 'chrono', 'nomap', 'records_loading', 'records_saving',
-                  'rle_compression', 'libdeflate_compression', 'zlib_compression', 'simple_save', 'zstd_compression']
+                  'rle_compression', 'libdeflate_compression', 'zlib_compression', 'simple_save', 'zstd_compression',
+                  'experimental_compression']
         exe = executable('test-'+test,'tests/'+test+'/main.cpp',
                         dependencies:[catch_dep, cdfpp_dep],
                         install: false

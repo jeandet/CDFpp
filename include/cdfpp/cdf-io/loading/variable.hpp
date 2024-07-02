@@ -119,15 +119,16 @@ namespace
 
     template <typename cdf_version_tag_t, typename buffer_t>
     inline void load_cvvr_data(const cdf_CVVR_t<cdf_version_tag_t>& cvvr, std::size_t& pos,
-        const cdf_compression_type compression_type, char* data, std::size_t data_len)
+        const cdf_compression_type compression_type, char* data, std::size_t data_len,
+        const CDF_Types cdf_type)
     {
         pos += decompression::inflate(
-            compression_type, cvvr.data.values, data + pos, data_len - pos);
+            compression_type, cvvr.data.values, data + pos, data_len - pos, cdf_type);
     }
 
     template <typename cdf_version_tag_t, typename stream_t>
     void load_var_data(stream_t& stream, char* data, std::size_t data_len, std::size_t& pos,
-        const cdf_VXR_t<cdf_version_tag_t>& vxr, uint32_t record_size,
+        const cdf_VXR_t<cdf_version_tag_t>& vxr, uint32_t record_size, const CDF_Types cdf_type,
         const cdf_compression_type compression_type)
     {
         for (auto i = 0UL; i < vxr.NusedEntries; i++)
@@ -148,22 +149,23 @@ namespace
                         load_vvr_data<cdf_version_tag_t, stream_t>(
                             stream, offset, vvr, record_count, record_size, pos, data, data_len);
                     },
-                    [&stream, &data, data_len, &pos, record_size, compression_type](
+                    [&stream, &data, data_len, &pos, record_size, cdf_type, compression_type](
                         vxr_t vxr) -> void
                     {
-                        load_var_data<cdf_version_tag_t, stream_t>(
-                            stream, data, data_len, pos, vxr, record_size, compression_type);
+                        load_var_data<cdf_version_tag_t, stream_t>(stream, data, data_len, pos, vxr,
+                            record_size, cdf_type, compression_type);
                         while (vxr.VXRnext)
                         {
                             load_record(vxr, stream, vxr.VXRnext);
-                            load_var_data<cdf_version_tag_t, stream_t>(
-                                stream, data, data_len, pos, vxr, record_size, compression_type);
+                            load_var_data<cdf_version_tag_t, stream_t>(stream, data, data_len, pos,
+                                vxr, record_size, cdf_type, compression_type);
                         }
                     },
-                    [&stream, &data, data_len, &pos, record_count, record_size, compression_type](
-                        const cvvr_t& cvvr) -> void {
+                    [&stream, &data, data_len, &pos, record_count, record_size, cdf_type,
+                        compression_type](const cvvr_t& cvvr) -> void
+                    {
                         load_cvvr_data<cdf_version_tag_t, stream_t>(
-                            cvvr, pos, compression_type, data, data_len);
+                            cvvr, pos, compression_type, data, data_len, cdf_type);
                     },
                     [](const std::monostate&) -> void {
                         throw std::runtime_error {
@@ -187,7 +189,7 @@ namespace
         if (vdr.VXRhead != 0 && load_record(vxr, stream, vdr.VXRhead))
         {
             load_var_data(stream, data.bytes_ptr(), record_count * record_size, pos, vxr,
-                record_size, compression_type);
+                record_size, vdr.DataType, compression_type);
             if (vxr.VXRnext)
             {
                 do
@@ -195,7 +197,7 @@ namespace
                     if (load_record(vxr, stream, vxr.VXRnext))
                     {
                         load_var_data(stream, data.bytes_ptr(), record_count * record_size, pos,
-                            vxr, record_size, compression_type);
+                            vxr, record_size, vdr.DataType, compression_type);
                     }
                     else
                     {

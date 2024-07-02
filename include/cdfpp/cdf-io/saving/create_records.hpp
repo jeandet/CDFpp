@@ -52,6 +52,14 @@ namespace saving
                 cpr.record.pCount = 1;
                 cpr.record.cParms.values.push_back(9);
                 break;
+#ifdef CDFPP_USE_ZSTD
+            case cdf_compression_type::zstd_compression:
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+            case cdf_compression_type::delta_plus_zstd_compression:
+            case cdf_compression_type::float_zstd_compression:
+#endif
+                break;
+#endif
             default:
                 throw std::invalid_argument { "Unsupported compression algorithm" };
                 break;
@@ -197,7 +205,8 @@ namespace saving
             auto cvvr = record_wrapper<cdf_CVVR_t<v3x_tag>> {};
             cvvr.record.data.values = compression::deflate(v.compression_type(),
                 std::string_view {
-                    v.bytes_ptr() + first_record * record_size, records_in_vvr * record_size });
+                    v.bytes_ptr() + first_record * record_size, records_in_vvr * record_size },
+                v.type(), record_size / cdf_type_size(v.type()));
             cvvr.record.cSize = std::size(cvvr.record.data.values);
             update_size(cvvr);
             return cvvr;

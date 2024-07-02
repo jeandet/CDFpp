@@ -119,7 +119,6 @@ def _max_integer_dtype(type1: np.dtype, type2: np.dtype):
     else:
         return type2
 
-    return None
 
 def _min_integer_dtype(values: list, target_type:np.dtype or None=None):
     min_v = np.min(values)
@@ -142,7 +141,7 @@ def _min_integer_dtype(values: list, target_type:np.dtype or None=None):
             return _max_integer_dtype(np.uint32, target_type)
         else:
             return _max_integer_dtype(np.uint64, target_type)
-    return None
+
 
 def _values_view_and_type(values: np.ndarray or list, data_type:DataType or None=None, target_type:DataType or None=None):
     if type(values) is list:

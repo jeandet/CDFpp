@@ -43,6 +43,10 @@ void def_enums_wrappers(T& mod)
         .value("huff_compression", cdf_compression_type::huff_compression)
 #ifdef CDFPP_USE_ZSTD
         .value("zstd_compression", cdf_compression_type::zstd_compression)
+#ifdef CDFPP_USE_EXPERIMENTAL_COMPRESSION
+        .value("delta_plus_zstd_compression", cdf_compression_type::delta_plus_zstd_compression)
+        .value("float_zstd_compression", cdf_compression_type::float_zstd_compression)
+#endif
 #endif
         ;
 
