@@ -52,6 +52,8 @@ endif
 pybind11_dep = dependency('pybind11')
 hedley_dep = dependency('hedley')
 fmt_dep = dependency('fmt')
+cpp_utils_dep = dependency('cpp_utils', fallback : ['cpp_utils', 'cpp_utils_dep'],
+                            default_options: ['with_tests=false'])
 if target_machine.cpu_family() == 'x86_64'
     xsimd_dep = dependency('xsimd')
 else
@@ -187,7 +189,7 @@ cdfpp_dep_inc = include_directories('include', '.')
 
 
 cdfpp_dep = declare_dependency(include_directories: cdfpp_dep_inc,
-                                dependencies: [zlib_dep, hedley_dep, fmt_dep, zstd_dep] + [simd_deps],
+                                dependencies: [zlib_dep, hedley_dep, fmt_dep, zstd_dep, cpp_utils_dep] + [simd_deps],
                                 link_args : link_args,
                                 compile_args : compile_args)
 
