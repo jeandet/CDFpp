@@ -107,11 +107,9 @@ cdfpp_headers = files(
     'include/cdfpp/chrono/cdf-leap-seconds.h',
     'include/cdfpp/cdf-io/cdf-io.hpp',
     'include/cdfpp/cdf-io/common.hpp',
-    'include/cdfpp/cdf-io/reflection.hpp',
     'include/cdfpp/cdf-io/desc-records.hpp',
     'include/cdfpp/cdf-io/endianness.hpp',
     'include/cdfpp/cdf-io/majority-swap.hpp',
-    'include/cdfpp/cdf-io/special-fields.hpp',
     'include/cdfpp/cdf-io/decompression.hpp',
     'include/cdfpp/cdf-io/compression.hpp',
     'include/cdfpp/cdf-io/zlib.hpp',
@@ -228,8 +226,6 @@ install_headers(
 install_headers(
 [
     'include/cdfpp/cdf-io/cdf-io.hpp',
-    'include/cdfpp/cdf-io/reflection.hpp',
-    'include/cdfpp/cdf-io/special-fields.hpp',
     'include/cdfpp/cdf-io/common.hpp',
     'include/cdfpp/cdf-io/desc-records.hpp',
     'include/cdfpp/cdf-io/decompression.hpp',

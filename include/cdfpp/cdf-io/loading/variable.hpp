@@ -56,9 +56,9 @@ namespace
             no_init_vector<uint32_t> shape;
             if (vdr.zNumDims)
             {
-                std::copy_if(std::cbegin(vdr.zDimSizes.values), std::cend(vdr.zDimSizes.values),
+                std::copy_if(std::cbegin(vdr.zDimSizes), std::cend(vdr.zDimSizes),
                     std::back_inserter(shape),
-                    [DimVarys = vdr.DimVarys.values.begin()]([[maybe_unused]] const auto& v) mutable
+                    [DimVarys = vdr.DimVarys.begin()]([[maybe_unused]] const auto& v) mutable
                     {
                         bool vary = *DimVarys != 0;
                         DimVarys++;
@@ -75,11 +75,11 @@ namespace
         else
         {
             no_init_vector<uint32_t> shape;
-            if (std::size(vdr.DimVarys.values) != 0)
+            if (std::size(vdr.DimVarys) != 0)
             {
-                std::copy_if(std::cbegin(context.gdr.rDimSizes.values),
-                    std::cend(context.gdr.rDimSizes.values), std::back_inserter(shape),
-                    [DimVarys = vdr.DimVarys.values.begin()]([[maybe_unused]] const auto& v) mutable
+                std::copy_if(std::cbegin(context.gdr.rDimSizes),
+                    std::cend(context.gdr.rDimSizes), std::back_inserter(shape),
+                    [DimVarys = vdr.DimVarys.begin()]([[maybe_unused]] const auto& v) mutable
                     {
                         bool vary = *DimVarys != 0;
                         DimVarys++;
@@ -126,7 +126,7 @@ namespace
         const cdf_compression_type compression_type, char* data, std::size_t data_len)
     {
         pos += decompression::inflate(
-            compression_type, cvvr.data.values, data + pos, data_len - pos);
+            compression_type, cvvr.data, data + pos, data_len - pos);
     }
 
     template <typename cdf_version_tag_t, typename stream_t>
@@ -136,10 +136,10 @@ namespace
     {
         for (auto i = 0UL; i < vxr.NusedEntries; i++)
         {
-            int record_count = vxr.Last.values[i] - vxr.First.values[i] + 1;
+            int record_count = vxr.Last[i] - vxr.First[i] + 1;
 
             if (cdf_mutable_variable_record_t<cdf_version_tag_t> cvvr_or_vvr {};
-                load_mut_record(cvvr_or_vvr, stream, vxr.Offset.values[i]))
+                load_mut_record(cvvr_or_vvr, stream, vxr.Offset[i]))
             {
                 using vvr_t = typename decltype(cvvr_or_vvr)::vvr_t;
                 using vxr_t = typename decltype(cvvr_or_vvr)::vxr_t;
@@ -147,7 +147,7 @@ namespace
 
                 cvvr_or_vvr.visit(
                     [&stream, &data, data_len, &pos, record_count, record_size,
-                        offset = vxr.Offset.values[i]](const vvr_t& vvr) -> void
+                        offset = vxr.Offset[i]](const vvr_t& vvr) -> void
                     {
                         load_vvr_data<cdf_version_tag_t, stream_t>(
                             stream, offset, vvr, record_count, record_size, pos, data, data_len);
@@ -219,7 +219,7 @@ namespace
         for (auto i = 0UL; i < vxr.NusedEntries && count < limit; i++)
         {
             if (cdf_mutable_variable_record_t<cdf_version_tag_t> rec {};
-                load_mut_record(rec, stream, vxr.Offset.values[i]))
+                load_mut_record(rec, stream, vxr.Offset[i]))
             {
                 using vvr_t = typename decltype(rec)::vvr_t;
                 using vxr_t = typename decltype(rec)::vxr_t;

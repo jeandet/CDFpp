@@ -110,7 +110,7 @@ namespace
                 no_init_vector<char> data(8UL + CCR.uSize);
                 buffer.read(data.data(), 0, 8);
                 decompression::inflate(
-                    CPR.cType, CCR.data.values, data.data() + 8UL, std::size(data) - 8UL);
+                    CPR.cType, CCR.data, data.data() + 8UL, std::size(data) - 8UL);
                 auto parsing_ctx = make_parsing_context(cdf_version_tag_t {},
                     buffers::make_shared_array_adapter(std::move(data)), CPR.cType);
                 return impl_parse_cdf<common::with_iso_8859_1_to_utf8<iso_8859_1_to_utf8>>(

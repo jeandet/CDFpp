@@ -26,45 +26,13 @@
 #pragma once
 
 #include "../desc-records.hpp"
-#include "../endianness.hpp"
-#include "../reflection.hpp"
-#include "../special-fields.hpp"
 #include "./buffers.hpp"
 #include "cdfpp/cdf-helpers.hpp"
+#include <cpp_utils/serde/serde.hpp>
 #include <functional>
 #include <string>
-#include <type_traits>
+#include <utility>
 #include <variant>
-namespace cdf::io::buffers
-{
-// Transitional shim, scoped to this file only: `buffers.hpp` no longer defines
-// get_data_ptr (cpp_utils::io buffer types are consumed directly there), but this
-// old record-loading engine still calls it in three distinct shapes below —
-// a raw pointer (records_loading test calls load_record directly on a
-// std::array/std::string buffer), a shared_buffer_t (from CDR/GDR loading,
-// which forwards `.data()`), and a parsing_context_t that holds one in its
-// `.buffer` member (from blk_iterator-driven VDR/ADR loading). Task 9 rewrites
-// this engine and drops get_data_ptr entirely, so this shim goes away with it.
-template <typename buffer_t>
-    requires std::is_pointer_v<buffer_t>
-constexpr auto get_data_ptr(buffer_t& buffer)
-{
-    return buffer;
-}
-
-template <typename buffer_t>
-constexpr auto get_data_ptr(buffer_t& buffer) -> decltype(buffer.data())
-{
-    return buffer.data();
-}
-
-template <typename buffer_t>
-constexpr auto get_data_ptr(buffer_t& buffer) -> decltype(get_data_ptr(buffer.buffer))
-{
-    return get_data_ptr(buffer.buffer);
-}
-}
-
 namespace cdf::io
 {
 
@@ -90,110 +58,45 @@ struct parsing_context_t
     }
 };
 
-SPLIT_FIELDS_FW_DECL(std::size_t, load_record, );
-
-template <typename record_t, typename parsing_context_t, typename T>
-inline std::size_t load_field(
-    const record_t& r, parsing_context_t& parsing_context, std::size_t offset, T& field)
+// Called with a raw buffer/stream directly — records with no external-context need
+// (CDR/GDR/CCR/CPR at file scope), or the unit tests exercising a raw pointer /
+// std::array. buffer_t&& (forwarding reference) rather than buffer_t&: unit tests
+// pass rvalue pointers (e.g. std::string::c_str(), std::array::data()), which cannot
+// bind to a plain lvalue reference.
+//
+// The explicit cpp_utils::serde::no_context{} is load-bearing, not decorative:
+// cpp_utils::serde::deserialize's mutating (SPLIT_FIELDS-generated) overload has no
+// default for its context parameter — unlike the value-returning convenience
+// overload — so omitting it doesn't fall back to no_context, it silently shifts
+// every field binding by one position (the first decomposed field gets bound to the
+// context slot instead of being read at all). Confirmed by a standalone repro
+// against the real cpp_utils headers before writing this comment.
+template <typename record_t, typename buffer_t>
+inline std::size_t load_record(record_t& r, buffer_t&& buffer, std::size_t offset)
 {
-    if constexpr (is_string_field_v<T>)
-    {
-        std::size_t size = 0;
-        for (; size < T::max_len; size++)
-        {
-            if (buffers::get_data_ptr(parsing_context)[offset + size] == '\0')
-                break;
-        }
-        field.value = std::string { buffers::get_data_ptr(parsing_context) + offset, size };
-        return offset + T::max_len;
-    }
-    else
-    {
-        if constexpr (is_table_field_v<T>)
-        {
-            const auto bytes = r.size(field);
-            field.values.resize(bytes / sizeof(typename T::value_type));
-            if (bytes > 0)
-            {
-                std::memcpy(
-                    field.values.data(), buffers::get_data_ptr(parsing_context) + offset, bytes);
-                cdf::endianness::decode_v<endianness::big_endian_t>(
-                    field.values.data(), bytes / sizeof(typename T::value_type));
-            }
-            return offset + bytes;
-        }
-        else
-        {
-            field = cdf::endianness::decode<endianness::big_endian_t, T>(
-                buffers::get_data_ptr(parsing_context) + offset);
-            return offset + sizeof(T);
-        }
-    }
-}
-template <typename record_t, typename parsing_context_t, typename T>
-inline std::size_t load_field(const record_t& r, parsing_context_t& parsing_context,
-    std::size_t offset, unused_field<T>& field)
-{
-    (void)r;
-    (void)parsing_context;
-    if constexpr (is_string_field_v<T>)
-    {
-        return offset + T::max_len;
-    }
-    else
-    {
-        if constexpr (is_table_field_v<T>)
-        {
-            return offset + r.size(field.value);
-        }
-        else
-        {
-            return offset + sizeof(T);
-        }
-    }
+    return cpp_utils::serde::deserialize(
+        r, std::forward<buffer_t>(buffer), offset, cpp_utils::serde::no_context {});
 }
 
-
-template <typename parsing_context_t, typename version_t>
-inline std::size_t load_field(const cdf_rVDR_t<version_t>& r, parsing_context_t& parsing_context,
-    std::size_t offset, decltype(std::declval<cdf_rVDR_t<version_t>>().DimVarys)& field)
+// Called with the full parsing_context_t (as begin_ADR/begin_VDR/etc. do) for a
+// record type that needs no external context — unwrap to the byte buffer.
+template <typename record_t, typename buffer_t, typename version_t>
+inline std::size_t load_record(
+    record_t& r, parsing_context_t<buffer_t, version_t>& parsing_context, std::size_t offset)
 {
-    using T = decltype(std::declval<cdf_rVDR_t<version_t>>().DimVarys);
-
-    const auto bytes = r.size(field, parsing_context.gdr.rNumDims);
-    field.values.resize(bytes / sizeof(typename T::value_type));
-    if (bytes > 0)
-    {
-        std::memcpy(field.values.data(), buffers::get_data_ptr(parsing_context) + offset, bytes);
-        cdf::endianness::decode_v<endianness::big_endian_t>(
-            field.values.data(), bytes / sizeof(typename T::value_type));
-    }
-    return offset + bytes;
+    return cpp_utils::serde::deserialize(
+        r, parsing_context.buffer, offset, cpp_utils::serde::no_context {});
 }
 
-template <typename record_t, typename parsing_context_t, typename T>
-inline std::size_t load_fields(const record_t& r, parsing_context_t& parsing_context,
-    [[maybe_unused]] std::size_t offset, T&& field)
+// cdf_rVDR_t specialization: DimVarys needs the GDR's rNumDims, external to the
+// record itself — thread it through as context.
+template <typename version_t, typename buffer_t>
+inline std::size_t load_record(cdf_rVDR_t<version_t>& r,
+    parsing_context_t<buffer_t, version_t>& parsing_context, std::size_t offset)
 {
-    using Field_t = std::remove_cv_t<std::remove_reference_t<T>>;
-    static constexpr std::size_t count = count_members<Field_t>;
-    if constexpr (std::is_compound_v<Field_t> && (count > 1) && (not is_string_field_v<Field_t>)
-        && (not is_table_field_v<Field_t>))
-        return load_record(field, parsing_context, offset);
-    else
-        return load_field(r, parsing_context, offset, std::forward<T>(field));
+    return cpp_utils::serde::deserialize(r, parsing_context.buffer, offset,
+        vdr_context_t<version_t> { parsing_context.gdr.rNumDims });
 }
-
-template <typename record_t, typename parsing_context_t, typename T, typename... Ts>
-inline std::size_t load_fields(const record_t& r, parsing_context_t& parsing_context,
-    [[maybe_unused]] std::size_t offset, T&& field, Ts&&... fields)
-{
-    offset = load_fields(r, parsing_context, offset, std::forward<T>(field));
-    return load_fields(r, parsing_context, offset, std::forward<Ts>(fields)...);
-}
-
-SPLIT_FIELDS(std::size_t, load_record, load_fields, );
-
 
 template <typename version_t>
 struct cdf_mutable_variable_record_t

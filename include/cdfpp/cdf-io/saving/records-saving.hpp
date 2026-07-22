@@ -27,21 +27,16 @@
 
 #include "../common.hpp"
 #include "../desc-records.hpp"
-#include "../endianness.hpp"
-#include "../reflection.hpp"
-#include "../special-fields.hpp"
 #include "cdfpp/attribute.hpp"
 #include "cdfpp/cdf-helpers.hpp"
 #include "cdfpp/variable.hpp"
+#include <cpp_utils/serde/serde.hpp>
 #include <algorithm>
 #include <optional>
 #include <utility>
 
 namespace cdf::io
 {
-
-SPLIT_FIELDS_FW_DECL([[nodiscard]] constexpr std::size_t, record_size, const);
-
 
 template <typename T>
 struct record_wrapper
@@ -57,27 +52,39 @@ struct record_wrapper
     }
 };
 
+// NOTE: setting header.record_type here is load-bearing, not defensive. The old
+// hand-rolled save engine wrote a record's on-disk record_type byte from the
+// compile-time cdf_DR_header<version_t,record_t>::expected_record_type template
+// parameter, never from this runtime member — so nothing ever needed to set it.
+// cpp_utils::serde::serialize() has no equivalent special case: it writes whatever
+// is in this runtime member as plain struct data. Every record must therefore reach
+// its first save() with the correct record_type already in place, and this function
+// runs on every record before it's ever saved.
 template <typename T>
 void update_size(record_wrapper<T>& record, std::size_t size_offset = 0)
 {
-    record.size = record_size(record.record) + size_offset;
+    record.size = cpp_utils::serde::runtime_size(record.record) + size_offset;
     record.record.header.record_size = record.size;
+    record.record.header.record_type = decltype(record.record.header)::expected_record_type;
 }
 
 
 void update_size(record_wrapper<cdf_CCR_t<v3x_tag>>& record, std::size_t size_offset = 0)
 {
-    record.size = std::size(record.record.data.values) + record_size(record.record.header)
-        + sizeof(record.record.uSize) + sizeof(record.record.CPRoffset) + sizeof(record.record.rfuA)
-        + size_offset;
+    record.size = std::size(record.record.data)
+        + cpp_utils::serde::runtime_size(record.record.header) + sizeof(record.record.uSize)
+        + sizeof(record.record.CPRoffset) + sizeof(record.record.rfuA) + size_offset;
     record.record.header.record_size = record.size;
+    record.record.header.record_type = decltype(record.record.header)::expected_record_type;
 }
 
 void update_size(record_wrapper<cdf_CVVR_t<v3x_tag>>& record, std::size_t size_offset = 0)
 {
-    record.size = std::size(record.record.data.values) + record_size(record.record.header)
-        + sizeof(record.record.rfuA) + sizeof(record.record.cSize) + size_offset;
+    record.size = std::size(record.record.data)
+        + cpp_utils::serde::runtime_size(record.record.header) + sizeof(record.record.rfuA)
+        + sizeof(record.record.cSize) + size_offset;
     record.record.header.record_size = record.size;
+    record.record.header.record_type = decltype(record.record.header)::expected_record_type;
 }
 
 struct file_attribute_ctx
@@ -139,136 +146,23 @@ struct saving_context
     cdf_body body;
 };
 
-
-template <typename record_t, typename T>
-[[nodiscard]] constexpr std::size_t field_size(const record_t& s, T& field)
+template <typename T>
+[[nodiscard]] constexpr std::size_t record_size(const T& s)
 {
-    if constexpr (is_string_field_v<T>)
-    {
-        return T::max_len;
-    }
-    else
-    {
-        if constexpr (is_table_field_v<T>)
-        {
-            return s.size(field);
-        }
-        else
-        {
-            return sizeof(T);
-        }
-    }
+    return cpp_utils::serde::runtime_size(s);
 }
 
-template <typename record_t, typename T>
-[[nodiscard]] constexpr std::size_t fields_size(const record_t& s, T&& field)
+template <typename T, typename writer_t>
+std::size_t save_record(const T& s, writer_t& writer)
 {
-    using Field_t = std::remove_cv_t<std::remove_reference_t<T>>;
-    constexpr std::size_t count = count_members<Field_t>;
-    if constexpr (std::is_compound_v<Field_t> && (count > 1) && (not is_string_field_v<Field_t>)
-        && (not is_table_field_v<Field_t>))
-        return record_size(field);
-    else
-        return field_size(s, std::forward<T>(field));
+    return cpp_utils::serde::serialize(s, writer);
 }
 
-template <typename record_t, typename T, typename... Ts>
-[[nodiscard]] constexpr std::size_t fields_size(const record_t& s, T&& field, Ts&&... fields)
-{
-    return fields_size(s, std::forward<T>(field)) + fields_size(s, std::forward<Ts>(fields)...);
-}
-
-SPLIT_FIELDS([[nodiscard]] constexpr std::size_t, record_size, fields_size, const);
-
-template <typename T, typename U>
-std::size_t save_record(const T& s, U& writer);
-
-template <typename writer_t, typename T>
-inline std::size_t save_field(writer_t& writer, const T& field)
-{
-    using Field_t = std::remove_cv_t<std::remove_reference_t<T>>;
-    if constexpr (is_string_field_v<T>)
-    {
-        writer.write(field.value.data(), field.value.length());
-        return writer.fill('\0', T::max_len - field.value.length());
-    }
-    else
-    {
-        if constexpr (is_table_field_v<T>)
-        {
-            if constexpr (sizeof(typename Field_t::value_type) == 1)
-            {
-                writer.write(
-                    reinterpret_cast<const char*>(field.values.data()), std::size(field.values));
-            }
-            else
-            {
-                for (auto& v : field.values)
-                {
-                    auto rv = endianness::decode<endianness::big_endian_t,
-                        typename Field_t::value_type>(&v);
-                    writer.write(
-                        reinterpret_cast<const char*>(&rv), sizeof(typename Field_t::value_type));
-                }
-            }
-
-            return writer.offset();
-        }
-        else
-        {
-            auto v = endianness::decode<endianness::big_endian_t, Field_t>(&field);
-            return writer.write(reinterpret_cast<char*>(&v), sizeof(Field_t));
-        }
-    }
-}
-
-template <typename strurt_t, cdf_record_type record_type, typename U>
-std::size_t save_header(const strurt_t& s, const cdf_DR_header<v3x_tag, record_type>& h, U& writer)
-{
-    save_field(
-        writer, std::max(static_cast<decltype(h.record_size)>(record_size(s)), h.record_size));
-    return save_field(writer, record_type);
-}
-
-
-template <typename strurt_t, typename writer_t, typename T>
-inline std::size_t save_fields(const strurt_t& s, writer_t& writer, const T& field)
-{
-    using Field_t = std::remove_cv_t<std::remove_reference_t<T>>;
-    static constexpr std::size_t count = count_members<Field_t>;
-    if constexpr (is_cdf_DR_header_v<Field_t>)
-        return save_header(s, field, writer);
-    else if constexpr (std::is_compound_v<Field_t> && (count > 1)
-        && (not is_string_field_v<Field_t>) && (not is_table_field_v<Field_t>))
-        return save_record(field, writer);
-    else
-        return save_field(writer, field);
-}
-
-template <typename strurt_t, typename writer_t, typename T, typename... Ts>
-inline std::size_t save_fields(
-    const strurt_t& s, writer_t& writer, const T& field, const Ts&... fields)
-{
-    save_fields(s, writer, field);
-    return save_fields(s, writer, fields...);
-}
-
-
-SPLIT_FIELDS(std::size_t, _save_record, save_fields, const);
-
-template <typename T, typename U>
-std::size_t save_record(const T& s, U& writer)
-{
-    return _save_record(s, writer);
-}
-
-template <typename U>
+template <typename writer_t>
 [[nodiscard]] std::size_t save_record(
-    const cdf_VVR_t<v3x_tag>& s, const char* data, std::size_t len, U& writer)
+    const cdf_VVR_t<v3x_tag>& s, const char* data, std::size_t len, writer_t& writer)
 {
-    save_field(
-        writer, static_cast<decltype(s.header.record_size)>(record_size(s.header) + len));
-    save_field(writer, cdf_record_type::VVR);
+    cpp_utils::serde::serialize(s.header, writer);
     return writer.write(data, len);
 }
 

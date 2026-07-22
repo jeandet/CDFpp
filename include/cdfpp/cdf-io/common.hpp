@@ -37,7 +37,18 @@
 
 namespace cdf::io::common
 {
-using magic_numbers_t = std::pair<uint32_t, uint32_t>;
+// Not std::pair: cpp_utils::reflexion::count_members miscounts std::pair's member
+// count (its piecewise_construct-tagged 3-argument constructor makes the "can this
+// type be constructed with N args" arity probe succeed at N=3 instead of 2, since
+// the probe's universal-conversion helper also matches std::piecewise_construct_t
+// and std::tuple). A plain 2-member aggregate with the same .first/.second field
+// names sidesteps that without any call-site changes.
+struct magic_numbers_t
+{
+    using endianness = cdf::endianness::big_endian_t;
+    uint32_t first;
+    uint32_t second;
+};
 using version_t = std::pair<uint8_t, uint8_t>;
 
 struct iso_8859_1_to_utf8_t

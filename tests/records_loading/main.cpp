@@ -12,7 +12,13 @@
 
 
 #include "cdfpp/cdf-io/loading/records-loading.hpp"
-#include "cdfpp/cdf-io/special-fields.hpp"
+#include <cpp_utils/serde/serde.hpp>
+
+using cpp_utils::serde::bounded_string;
+using cpp_utils::serde::dynamic_array;
+using cpp_utils::serde::unused;
+using cpp_utils::reflexion::count_members;
+using cdf::io::cdf_record_endianness;
 
 SCENARIO("record loading", "[CDF]")
 {
@@ -27,7 +33,7 @@ SCENARIO("record loading", "[CDF]")
         THEN("we can load it from a buffer")
         {
             std::string buffer { "cd" };
-            cdf::io::load_record(s, buffer.c_str(), 0);
+            cdf::io::load_record(s, buffer, 0);
             REQUIRE(s.a == 'c');
             REQUIRE(s.b == 'd');
         }
@@ -37,13 +43,13 @@ SCENARIO("record loading", "[CDF]")
         struct two_chars
         {
             char a;
-            unused_field<char> b;
+            unused<char> b;
         };
-        two_chars s { 'a', 'b' };
+        two_chars s { 'a', { 'b' } };
         THEN("we can load it from a buffer")
         {
             std::string buffer { "cd" };
-            cdf::io::load_record(s, buffer.c_str(), 0);
+            cdf::io::load_record(s, buffer, 0);
             REQUIRE(s.a == 'c');
             REQUIRE(s.b.value == 'b');
         }
@@ -52,6 +58,7 @@ SCENARIO("record loading", "[CDF]")
     {
         struct complex_record
         {
+            using endianness = cdf_record_endianness;
             char a;
             double b;
             uint32_t c;
@@ -62,7 +69,7 @@ SCENARIO("record loading", "[CDF]")
             complex_record s { 0, 0., 0, 0 };
             std::array<char, 21> buffer { 0x2A, 0x40, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A };
-            cdf::io::load_record(s, buffer.data(), 0);
+            cdf::io::load_record(s, buffer, 0);
             REQUIRE(s.a == 42);
             REQUIRE(s.b == 42.);
             REQUIRE(s.c == 42);
@@ -73,7 +80,7 @@ SCENARIO("record loading", "[CDF]")
             complex_record s { 0, 0., 0, 0 };
             std::array<char, 22> buffer { 0x11, 0x2A, 0x40, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A };
-            cdf::io::load_record(s, buffer.data(), 1);
+            cdf::io::load_record(s, buffer, 1);
             REQUIRE(s.a == 42);
             REQUIRE(s.b == 42.);
             REQUIRE(s.c == 42);
@@ -84,6 +91,7 @@ SCENARIO("record loading", "[CDF]")
     {
         struct inner_record
         {
+            using endianness = cdf_record_endianness;
             uint16_t a;
             uint16_t b;
         };
@@ -97,7 +105,7 @@ SCENARIO("record loading", "[CDF]")
         {
             outer_record s { 0, { 0, 0 }, 0 };
             std::array<char, 6> buffer { 0x2A, 0x0, 0x2A, 0x0, 0x2A, 0x2A };
-            cdf::io::load_record(s, buffer.data(), 0);
+            cdf::io::load_record(s, buffer, 0);
             REQUIRE(s.a == 42);
             REQUIRE(s.b.a == 42);
             REQUIRE(s.b.b == 42);
@@ -108,9 +116,10 @@ SCENARIO("record loading", "[CDF]")
     {
         struct record_with_string
         {
+            using endianness = cdf_record_endianness;
             char a;
             double b;
-            string_field<8> c;
+            bounded_string<8> c;
             uint64_t d;
         };
         THEN("we can load it from a buffer")
@@ -118,7 +127,7 @@ SCENARIO("record loading", "[CDF]")
             record_with_string s { 0, 0., { "" }, 0 };
             std::array<char, 25> buffer { 0x2A, 0x40, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 'h',
                 'e', 'l', 'l', 'o', 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A };
-            cdf::io::load_record(s, buffer.data(), 0);
+            cdf::io::load_record(s, buffer, 0);
             REQUIRE(s.a == 42);
             REQUIRE(s.b == 42.);
             REQUIRE(s.c.value == "hello");
@@ -129,30 +138,34 @@ SCENARIO("record loading", "[CDF]")
     {
         struct record_table_fields
         {
+            using endianness = cdf_record_endianness;
             char a;
             double b;
-            table_field<uint16_t, 0> c;
+            dynamic_array<0, uint16_t> c;
             uint64_t d;
-            table_field<uint32_t, 1> e;
+            dynamic_array<1, uint32_t> e;
 
-            std::size_t size(const table_field<uint16_t, 0>&) const
+            std::size_t field_size(const dynamic_array<0, uint16_t>&) const
             {
-                return this->a * sizeof(uint16_t);
+                return this->a;
             }
-            std::size_t size(const table_field<uint32_t, 1>&) const { return 2 * sizeof(uint32_t); }
+            std::size_t field_size(const dynamic_array<1, uint32_t>&) const
+            {
+                return 2;
+            }
         };
         THEN("we can load it from a buffer")
         {
-            record_table_fields s;
+            record_table_fields s {};
             std::array<char, 33> buffer { 0x4, 0x40, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0,
                 0x01, 0x0, 0x2, 0x0, 0x3, 0x0, 0x4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A,
                 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02 };
-            cdf::io::load_record(s, buffer.data(), 0);
+            cdf::io::load_record(s, buffer, 0);
             REQUIRE(s.a == 4);
             REQUIRE(s.b == 42.);
-            REQUIRE(s.c.values == std::vector<uint16_t> { 1, 2, 3, 4 });
+            REQUIRE(std::vector<uint16_t>(s.c.begin(), s.c.end()) == std::vector<uint16_t> { 1, 2, 3, 4 });
             REQUIRE(s.d == 42);
-            REQUIRE(s.e.values == no_init_vector<uint32_t> { 1, 2 });
+            REQUIRE(std::vector<uint32_t>(s.e.begin(), s.e.end()) == std::vector<uint32_t> { 1, 2 });
             static_assert(count_members<decltype(s)> == 5);
         }
     }

@@ -39,6 +39,7 @@
 #include "cdfpp/no_init_vector.hpp"
 #include "cdfpp_config.h"
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <numeric>
@@ -233,12 +234,14 @@ Greenbelt, Maryland 20771 USA
     {
         if (svg_ctx.ccr and svg_ctx.cpr)
         {
-            svg_ctx.ccr->record.data.values.reserve(svg_ctx.body.gdr.record.eof);
-            buffers::vector_writer writer { svg_ctx.ccr->record.data.values };
+            svg_ctx.ccr->record.data.reserve(svg_ctx.body.gdr.record.eof);
+            buffers::vector_writer writer { svg_ctx.ccr->record.data };
             write_body(svg_ctx.body, writer, 8);
             svg_ctx.ccr->record.uSize = std::size(writer.data);
-            svg_ctx.ccr->record.data.values
-                = compression::deflate(svg_ctx.compression, writer.data);
+            auto compressed
+                = compression::deflate(svg_ctx.compression, no_init_vector<char>(writer.data.begin(), writer.data.end()));
+            svg_ctx.ccr->record.data.resize(std::size(compressed));
+            std::memcpy(svg_ctx.ccr->record.data.data(), compressed.data(), std::size(compressed));
             update_size(svg_ctx.ccr.value());
             svg_ctx.cpr->offset = svg_ctx.ccr->offset + svg_ctx.ccr->size;
             svg_ctx.ccr->record.CPRoffset = svg_ctx.cpr->offset;
