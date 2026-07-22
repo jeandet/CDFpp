@@ -14,11 +14,11 @@
 #include "cdfpp/cdf-io/loading/records-loading.hpp"
 #include <cpp_utils/serde/serde.hpp>
 
+using cdf::io::cdf_record_endianness;
+using cpp_utils::reflexion::count_members;
 using cpp_utils::serde::bounded_string;
 using cpp_utils::serde::dynamic_array;
 using cpp_utils::serde::unused;
-using cpp_utils::reflexion::count_members;
-using cdf::io::cdf_record_endianness;
 
 SCENARIO("record loading", "[CDF]")
 {
@@ -145,14 +145,8 @@ SCENARIO("record loading", "[CDF]")
             uint64_t d;
             dynamic_array<1, uint32_t> e;
 
-            std::size_t field_size(const dynamic_array<0, uint16_t>&) const
-            {
-                return this->a;
-            }
-            std::size_t field_size(const dynamic_array<1, uint32_t>&) const
-            {
-                return 2;
-            }
+            std::size_t field_size(const dynamic_array<0, uint16_t>&) const { return this->a; }
+            std::size_t field_size(const dynamic_array<1, uint32_t>&) const { return 2; }
         };
         THEN("we can load it from a buffer")
         {
@@ -163,9 +157,11 @@ SCENARIO("record loading", "[CDF]")
             cdf::io::load_record(s, buffer, 0);
             REQUIRE(s.a == 4);
             REQUIRE(s.b == 42.);
-            REQUIRE(std::vector<uint16_t>(s.c.begin(), s.c.end()) == std::vector<uint16_t> { 1, 2, 3, 4 });
+            REQUIRE(std::vector<uint16_t>(s.c.begin(), s.c.end())
+                == std::vector<uint16_t> { 1, 2, 3, 4 });
             REQUIRE(s.d == 42);
-            REQUIRE(std::vector<uint32_t>(s.e.begin(), s.e.end()) == std::vector<uint32_t> { 1, 2 });
+            REQUIRE(
+                std::vector<uint32_t>(s.e.begin(), s.e.end()) == std::vector<uint32_t> { 1, 2 });
             static_assert(count_members<decltype(s)> == 5);
         }
     }
