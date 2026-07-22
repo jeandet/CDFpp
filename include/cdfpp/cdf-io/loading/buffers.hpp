@@ -25,10 +25,10 @@
 ----------------------------------------------------------------------------*/
 #pragma once
 
+#include <cdfpp/no_init_vector.hpp>
 #include <cpp_utils/io/buffer_view.hpp>
 #include <cpp_utils/io/memory_mapped_file.hpp>
 #include <cpp_utils/io/owned_buffer.hpp>
-#include <cdfpp/no_init_vector.hpp>
 #include <memory>
 #include <span>
 #include <string>
@@ -84,16 +84,14 @@ inline auto make_shared_array_adapter(no_init_vector<char>&& array)
 
 inline auto make_shared_array_adapter(const std::vector<char>& array)
 {
-    return shared_buffer_t<buffer_view> {
-        std::make_shared<buffer_view>(std::span<const char> { array.data(), array.size() })
-    };
+    return shared_buffer_t<buffer_view> { std::make_shared<buffer_view>(
+        std::span<const char> { array.data(), array.size() }) };
 }
 
 inline auto make_shared_array_adapter(const char* const data, std::size_t size)
 {
-    return shared_buffer_t<buffer_view> {
-        std::make_shared<buffer_view>(std::span<const char> { data, size })
-    };
+    return shared_buffer_t<buffer_view> { std::make_shared<buffer_view>(
+        std::span<const char> { data, size }) };
 }
 
 inline auto make_shared_file_adapter(const std::string& path)

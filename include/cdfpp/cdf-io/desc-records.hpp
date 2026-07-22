@@ -235,17 +235,6 @@ constexpr std::size_t packed_size(const cdf_AzEDR_t<T>& c)
         + sizeof(c.rfC) + sizeof(c.rfD) + sizeof(c.rfE);
 }
 
-template <cdf_r_z>
-struct cdf_rzVDR_t
-{
-};
-
-template <>
-struct cdf_rzVDR_t<cdf_r_z::r>
-{
-    uint32_t rNumDims;
-};
-
 // Only cdf_rVDR_t's DimVarys needs state external to the record itself (the GDR's
 // rNumDims) to resolve its size — every other dynamic-size field below sizes itself
 // from its own fields, so a single-argument field_size(field) covers them.
@@ -283,8 +272,8 @@ struct cdf_rVDR_t
     cpp_utils::serde::dynamic_array<0, int32_t> DimVarys;
     cpp_utils::serde::dynamic_array<1, int32_t> PadValues;
 
-    std::size_t field_size(
-        const cpp_utils::serde::dynamic_array<0, int32_t>&, const vdr_context_t<version_t>& ctx) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, int32_t>&,
+        const vdr_context_t<version_t>& ctx) const
     {
         return ctx.rNumDims;
     }

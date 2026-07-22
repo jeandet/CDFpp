@@ -59,10 +59,10 @@ struct parsing_context_t
 };
 
 // Called with a raw buffer/stream directly — records with no external-context need
-// (CDR/GDR/CCR/CPR at file scope), or the unit tests exercising a raw pointer /
-// std::array. buffer_t&& (forwarding reference) rather than buffer_t&: unit tests
-// pass rvalue pointers (e.g. std::string::c_str(), std::array::data()), which cannot
-// bind to a plain lvalue reference.
+// (CDR/GDR/CCR/CPR at file scope), or the unit tests exercising a buffer container
+// directly. buffer_t&& (forwarding reference) rather than buffer_t&: it's simply the
+// more general choice, binding both lvalue containers (as every call site does today)
+// and any rvalue that might be passed, without needing two overloads.
 //
 // The explicit cpp_utils::serde::no_context{} is load-bearing, not decorative:
 // cpp_utils::serde::deserialize's mutating (SPLIT_FIELDS-generated) overload has no

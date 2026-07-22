@@ -44,6 +44,7 @@
 #include <iostream>
 #include <numeric>
 #include <optional>
+#include <string_view>
 #include <utility>
 
 namespace cdf::io
@@ -238,8 +239,8 @@ Greenbelt, Maryland 20771 USA
             buffers::vector_writer writer { svg_ctx.ccr->record.data };
             write_body(svg_ctx.body, writer, 8);
             svg_ctx.ccr->record.uSize = std::size(writer.data);
-            auto compressed
-                = compression::deflate(svg_ctx.compression, no_init_vector<char>(writer.data.begin(), writer.data.end()));
+            auto compressed = compression::deflate(svg_ctx.compression,
+                std::string_view { writer.data.data(), std::size(writer.data) });
             svg_ctx.ccr->record.data.resize(std::size(compressed));
             std::memcpy(svg_ctx.ccr->record.data.data(), compressed.data(), std::size(compressed));
             update_size(svg_ctx.ccr.value());
