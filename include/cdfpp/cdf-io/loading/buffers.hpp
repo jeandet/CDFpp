@@ -41,6 +41,7 @@ namespace cdf::io::buffers
 using cpp_utils::io::buffer_view;
 using cpp_utils::io::memory_mapped_file;
 using cpp_utils::io::owned_buffer;
+using cpp_utils::io::owned_buffer_t;
 
 /** Adds shared-ownership (cheap-copy, stable-address) semantics on top of a
  * random_access_buffer, so a single mmap'd file / owned vector can be referenced
@@ -80,6 +81,18 @@ private:
 inline auto make_shared_array_adapter(no_init_vector<char>&& array)
 {
     return shared_buffer_t<owned_buffer> { std::make_shared<owned_buffer>(std::move(array)) };
+}
+
+// A caller-supplied std::vector<char> rvalue must be genuinely owned, not viewed — the
+// caller's vector is typically a temporary that dies at the end of this call. Wrapping
+// std::vector<char> directly (rather than converting to no_init_vector<char> first)
+// keeps this a real move: no_init_vector uses a different allocator, so there is no
+// implicit conversion between the two, only an O(n) copy.
+inline auto make_shared_array_adapter(std::vector<char>&& array)
+{
+    return shared_buffer_t<owned_buffer_t<std::vector<char>>> {
+        std::make_shared<owned_buffer_t<std::vector<char>>>(std::move(array))
+    };
 }
 
 inline auto make_shared_array_adapter(const std::vector<char>& array)

@@ -148,9 +148,9 @@ namespace
     }
 
     template <typename buffer_t, typename iso_8859_1_to_utf8>
-    [[nodiscard]] auto _impl_load(buffer_t&& buffer, iso_8859_1_to_utf8 iso_8859_1_to_utf8_tag,
-        bool lazy_load = false) -> decltype(buffer.read(std::declval<char*>(), 0UL, 0UL),
-                                    std::optional<CDF> {})
+    [[nodiscard]] auto _impl_load(
+        buffer_t&& buffer, iso_8859_1_to_utf8 iso_8859_1_to_utf8_tag, bool lazy_load = false)
+        -> decltype(buffer.read(std::declval<char*>(), 0UL, 0UL), std::optional<CDF> {})
     {
         auto magic = get_magic(buffer);
         if (common::is_cdf(magic))
@@ -202,7 +202,7 @@ namespace
 }
 
 [[nodiscard]] std::optional<CDF> load(
-    const std::vector<char>&& data, bool iso_8859_1_to_utf8 = true, bool lazy_load = true)
+    std::vector<char>&& data, bool iso_8859_1_to_utf8 = true, bool lazy_load = true)
 {
     if (std::size(data))
     {

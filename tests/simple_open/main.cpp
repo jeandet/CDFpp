@@ -75,8 +75,8 @@ impl_compare_attribute_value(const cdf::VariableAttribute& attribute, const valu
 }
 
 template <int index, typename attr_t, typename value_type>
-auto impl_compare_attribute_value(const attr_t& attribute,
-    const value_type& value) -> decltype(std::cbegin(value), value.at(0), attribute.value(), true)
+auto impl_compare_attribute_value(const attr_t& attribute, const value_type& value)
+    -> decltype(std::cbegin(value), value.at(0), attribute.value(), true)
 {
     return attribute.template get<
                typename std::remove_const_t<std::remove_reference_t<value_type>>::value_type>()
@@ -84,8 +84,8 @@ auto impl_compare_attribute_value(const attr_t& attribute,
 }
 
 template <int index, typename attr_t, typename value_type>
-auto impl_compare_attribute_value(const attr_t& attribute,
-    const value_type& value) -> decltype(std::cbegin(value), value.at(0), attribute[0], true)
+auto impl_compare_attribute_value(const attr_t& attribute, const value_type& value)
+    -> decltype(std::cbegin(value), value.at(0), attribute[0], true)
 {
     return attribute.template get<
                typename std::remove_const_t<std::remove_reference_t<value_type>>::value_type>(index)
@@ -377,6 +377,33 @@ SCENARIO("Loading cdf files", "[CDF]")
                 CHECK_VARIABLES(cd);
             }
         }
+        WHEN("In memory data is a temporary std::vector (rvalue) holding a cdf file")
+        {
+            auto path = std::string(DATA_PATH) + "/a_cdf.cdf";
+            REQUIRE(file_exists(path));
+            auto read_file = [&]() -> std::vector<char>
+            {
+                std::fstream file { path, std::ios::binary | std::ios::in };
+                if (file.is_open())
+                {
+                    std::vector<char> data(filesize(file));
+                    file.read(data.data(), static_cast<int64_t>(std::size(data)));
+                    return data;
+                }
+                return {};
+            };
+            // Passing the temporary directly (not a named lvalue) selects load()'s
+            // rvalue-reference overload, which must take real ownership of the buffer —
+            // the temporary is destroyed at the end of this full expression, before any
+            // lazily-loaded variable value is ever read.
+            auto cd_opt = cdf::io::load(read_file());
+            REQUIRE(cd_opt != std::nullopt);
+            auto cd = *cd_opt;
+            THEN("All expected variables are loaded correctly, after the source temporary is gone")
+            {
+                CHECK_VARIABLES(cd);
+            }
+        }
         WHEN("In memory data as char* is a cdf file")
         {
             auto path = std::string(DATA_PATH) + "/a_cdf.cdf";
@@ -588,11 +615,32 @@ SCENARIO("Loading cdf files", "[CDF]")
             THEN("We can access Rules_of_use attribute")
             {
                 REQUIRE(has_attribute(cd, "Rules_of_use"));
-                REQUIRE(compare_attribute_values(
-                    cd.attributes["Rules_of_use"],
-                        "Access to the data is provided as-is, without any additional promises to respond quickly to outages, data quality, etc. We request that you acknowledge the Finnish Meteorological Institute, Tromsø Geophysical Observatory of the University of Tromsø, and Tartu Observatory for use of the FMI data."
-                    ));
+                REQUIRE(compare_attribute_values(cd.attributes["Rules_of_use"],
+                    "Access to the data is provided as-is, without any additional promises to "
+                    "respond quickly to outages, data quality, etc. We request that you "
+                    "acknowledge the Finnish Meteorological Institute, Tromsø Geophysical "
+                    "Observatory of the University of Tromsø, and Tartu Observatory for use of the "
+                    "FMI data."));
             }
+        }
+    }
+}
+
+SCENARIO("make_shared_array_adapter ownership semantics", "[CDF]")
+{
+    GIVEN("a std::vector<char> passed as an rvalue")
+    {
+        std::vector<char> data(1024, 'A');
+        const char* original_ptr = data.data();
+
+        auto adapter = cdf::io::buffers::make_shared_array_adapter(std::move(data));
+
+        THEN("the adapter truly takes ownership instead of viewing the (now destroyed) source")
+        {
+            REQUIRE(data.data() == nullptr); // moved-from: source relinquished its buffer
+            REQUIRE(adapter.data() == original_ptr); // same heap block landed in the adapter
+            REQUIRE(adapter.size() == 1024);
+            REQUIRE(adapter.is_valid());
         }
     }
 }
