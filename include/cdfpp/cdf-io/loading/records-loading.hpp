@@ -33,7 +33,38 @@
 #include "cdfpp/cdf-helpers.hpp"
 #include <functional>
 #include <string>
+#include <type_traits>
 #include <variant>
+namespace cdf::io::buffers
+{
+// Transitional shim, scoped to this file only: `buffers.hpp` no longer defines
+// get_data_ptr (cpp_utils::io buffer types are consumed directly there), but this
+// old record-loading engine still calls it in three distinct shapes below —
+// a raw pointer (records_loading test calls load_record directly on a
+// std::array/std::string buffer), a shared_buffer_t (from CDR/GDR loading,
+// which forwards `.data()`), and a parsing_context_t that holds one in its
+// `.buffer` member (from blk_iterator-driven VDR/ADR loading). Task 9 rewrites
+// this engine and drops get_data_ptr entirely, so this shim goes away with it.
+template <typename buffer_t>
+    requires std::is_pointer_v<buffer_t>
+constexpr auto get_data_ptr(buffer_t& buffer)
+{
+    return buffer;
+}
+
+template <typename buffer_t>
+constexpr auto get_data_ptr(buffer_t& buffer) -> decltype(buffer.data())
+{
+    return buffer.data();
+}
+
+template <typename buffer_t>
+constexpr auto get_data_ptr(buffer_t& buffer) -> decltype(get_data_ptr(buffer.buffer))
+{
+    return get_data_ptr(buffer.buffer);
+}
+}
+
 namespace cdf::io
 {
 
