@@ -12,7 +12,10 @@
 
 
 #include "cdfpp/cdf-io/saving/records-saving.hpp"
-#include "cdfpp/cdf-io/special-fields.hpp"
+#include <cpp_utils/serde/serde.hpp>
+
+using cpp_utils::serde::bounded_string;
+using cpp_utils::serde::dynamic_array;
 
 SCENARIO("record loading", "[CDF]")
 {
@@ -72,7 +75,7 @@ SCENARIO("record loading", "[CDF]")
         {
             char a;
             double b;
-            string_field<8> c;
+            bounded_string<8> c;
             uint64_t d;
         };
         THEN("we can load it from a buffer")
@@ -89,19 +92,30 @@ SCENARIO("record loading", "[CDF]")
         {
             char a;
             double b;
-            table_field<uint16_t, 0> c;
+            dynamic_array<0, uint16_t> c;
             uint64_t d;
-            table_field<uint32_t, 1> e;
+            dynamic_array<1, uint32_t> e;
 
-            std::size_t size(const table_field<uint16_t, 0>&) const
+            std::size_t field_size(const dynamic_array<0, uint16_t>&) const
             {
-                return this->a * sizeof(uint16_t);
+                return this->a;
             }
-            std::size_t size(const table_field<uint32_t, 1>&) const { return 2 * sizeof(uint32_t); }
+            std::size_t field_size(const dynamic_array<1, uint32_t>&) const
+            {
+                return 2;
+            }
         };
         THEN("we can load it from a buffer")
         {
+            // record_size (unlike load) sums each dynamic_array's OWN current
+            // .size(), not field_size() — matching how CDFpp actually saves:
+            // create_records.hpp always resizes an array to its intended element
+            // count before update_size()/save_record() ever runs, so field_size()
+            // only needs to be consulted on the load path (deserialize's
+            // resolve_field_size). Populate `e` to the 2 elements field_size()
+            // would have implied, matching real usage.
             record_table_fields s{0,0.,{},0,{}};
+            s.e.resize(2);
             REQUIRE(cdf::io::record_size(s)==25);
         }
     }

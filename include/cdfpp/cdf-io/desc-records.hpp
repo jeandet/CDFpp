@@ -25,13 +25,27 @@
 ----------------------------------------------------------------------------*/
 #pragma once
 #include "../cdf-enums.hpp"
-#include "special-fields.hpp"
+#include <cpp_utils/endianness/endianness.hpp>
+#include <cpp_utils/serde/serde.hpp>
 #include <cstdint>
 #include <tuple>
 #include <type_traits>
 
 namespace cdf::io
 {
+
+// All CDF internal metadata records (CDR, GDR, ADR, xDR, VXR, VVR/CVVR/CCR/CPR
+// headers, ...) are stored on disk in big-endian ("network") byte order, always —
+// independent of the CDR's Encoding field, which only governs the byte order of
+// actual variable *data* values inside VVR/CVVR payloads. Verified against a real
+// NASA-generated fixture (tests/resources/a_cdf.cdf): its CDR's record_size field
+// reads as big-endian bytes `00 00 00 00 00 00 01 38` (=312, the expected v3 CDR
+// size). Every record struct below that owns at least one directly-serialized
+// fundamental/enum field must declare this marker — cpp_utils::serde resolves
+// endianness per the *immediate* enclosing composite of a field, not the outermost
+// record, so cdf_DR_header needs its own marker too (its record_size/record_type
+// fields are processed with cdf_DR_header itself as the parent composite).
+using cdf_record_endianness = cpp_utils::endianness::big_endian_t;
 
 struct v3x_tag
 {
@@ -59,13 +73,14 @@ template <typename version_t>
 using cdf_offset_field_t = std::conditional_t<is_v3_v<version_t>, uint64_t, uint32_t>;
 
 template <typename version_t, std::size_t v3size, std::size_t v2size>
-using cdf_string_field_t
-    = std::conditional_t<is_v3_v<version_t>, string_field<v3size>, string_field<v2size>>;
+using cdf_string_field_t = std::conditional_t<is_v3_v<version_t>,
+    cpp_utils::serde::bounded_string<v3size>, cpp_utils::serde::bounded_string<v2size>>;
 
 template <typename version_t, cdf_record_type record_t>
 struct cdf_DR_header
 {
     using cdf_version_t = version_t;
+    using endianness = cdf_record_endianness;
     static constexpr cdf_record_type expected_record_type = record_t;
     cdf_offset_field_t<version_t> record_size;
     cdf_record_type record_type;
@@ -94,18 +109,20 @@ struct cdf_CDR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::CDR> header;
     cdf_offset_field_t<version_t> GDRoffset;
     uint32_t Version;
     uint32_t Release;
     cdf_encoding Encoding;
     uint32_t Flags;
-    unused_field<int32_t> rfuA;
-    unused_field<int32_t> rfuB;
+    cpp_utils::serde::unused<int32_t> rfuA;
+    cpp_utils::serde::unused<int32_t> rfuB;
     uint32_t Increment;
     uint32_t Identifier;
-    unused_field<int32_t> rfuE;
-    std::conditional_t<is_v2_4_or_less_v<version_t>, string_field<1945>, string_field<256>>
+    cpp_utils::serde::unused<int32_t> rfuE;
+    std::conditional_t<is_v2_4_or_less_v<version_t>, cpp_utils::serde::bounded_string<1945>,
+        cpp_utils::serde::bounded_string<256>>
         copyright;
 };
 
@@ -114,6 +131,7 @@ struct cdf_GDR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::GDR> header;
     cdf_offset_field_t<version_t> rVDRhead;
     cdf_offset_field_t<version_t> zVDRhead;
@@ -125,14 +143,14 @@ struct cdf_GDR_t
     uint32_t rNumDims;
     uint32_t NzVars;
     cdf_offset_field_t<version_t> UIRhead;
-    unused_field<int32_t> rfuC;
+    cpp_utils::serde::unused<int32_t> rfuC;
     uint32_t LeapSecondLastUpdated;
-    unused_field<int32_t> rfuE;
-    table_field<uint32_t, 0> rDimSizes;
+    cpp_utils::serde::unused<int32_t> rfuE;
+    cpp_utils::serde::dynamic_array<0, uint32_t> rDimSizes;
 
-    std::size_t size(const table_field<uint32_t, 0>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, uint32_t>&) const
     {
-        return this->rNumDims * sizeof(uint32_t);
+        return this->rNumDims;
     }
 };
 
@@ -141,6 +159,7 @@ struct cdf_ADR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::ADR> header;
     cdf_offset_field_t<version_t> ADRnext;
     cdf_offset_field_t<version_t> AgrEDRhead;
@@ -148,11 +167,11 @@ struct cdf_ADR_t
     int32_t num;
     int32_t NgrEntries;
     int32_t MAXgrEntries;
-    unused_field<int32_t> rfuA;
+    cpp_utils::serde::unused<int32_t> rfuA;
     cdf_offset_field_t<version_t> AzEDRhead;
     int32_t NzEntries;
     int32_t MAXzEntries;
-    unused_field<int32_t> rfuE;
+    cpp_utils::serde::unused<int32_t> rfuE;
     cdf_string_field_t<version_t, 256, 64> Name;
 };
 
@@ -161,6 +180,7 @@ struct cdf_AgrEDR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::AgrEDR> header;
     cdf_offset_field_t<version_t> AEDRnext;
     int32_t AttrNum;
@@ -168,16 +188,10 @@ struct cdf_AgrEDR_t
     int32_t Num;
     int32_t NumElements;
     int32_t NumStrings;
-    unused_field<int32_t> rfB;
-    unused_field<int32_t> rfC;
-    unused_field<int32_t> rfD;
-    unused_field<int32_t> rfE;
-    // table_field<uint32_t> Values;
-
-    /*std::size_t size(const table_field<uint32_t, 0>&) const
-    {
-        return this->rNumDims * sizeof(uint16_t);
-    }*/
+    cpp_utils::serde::unused<int32_t> rfB;
+    cpp_utils::serde::unused<int32_t> rfC;
+    cpp_utils::serde::unused<int32_t> rfD;
+    cpp_utils::serde::unused<int32_t> rfE;
 };
 
 template <typename version_t>
@@ -185,6 +199,7 @@ struct cdf_AzEDR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::AzEDR> header;
     cdf_offset_field_t<version_t> AEDRnext;
     int32_t AttrNum;
@@ -192,16 +207,10 @@ struct cdf_AzEDR_t
     int32_t Num;
     int32_t NumElements;
     int32_t NumStrings;
-    unused_field<int32_t> rfB;
-    unused_field<int32_t> rfC;
-    unused_field<int32_t> rfD;
-    unused_field<int32_t> rfE;
-    // table_field<uint32_t> Values;
-
-    /*std::size_t size(const table_field<uint32_t, 0>&) const
-    {
-        return this->rNumDims * sizeof(uint16_t);
-    }*/
+    cpp_utils::serde::unused<int32_t> rfB;
+    cpp_utils::serde::unused<int32_t> rfC;
+    cpp_utils::serde::unused<int32_t> rfD;
+    cpp_utils::serde::unused<int32_t> rfE;
 };
 
 template <typename... T, typename U = cdf_DR_header<T...>>
@@ -237,11 +246,21 @@ struct cdf_rzVDR_t<cdf_r_z::r>
     uint32_t rNumDims;
 };
 
+// Only cdf_rVDR_t's DimVarys needs state external to the record itself (the GDR's
+// rNumDims) to resolve its size — every other dynamic-size field below sizes itself
+// from its own fields, so a single-argument field_size(field) covers them.
+template <typename version_t>
+struct vdr_context_t
+{
+    int32_t rNumDims;
+};
+
 template <typename version_t>
 struct cdf_rVDR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::rVDR> header;
     cdf_offset_field_t<version_t> VDRnext;
     CDF_Types DataType;
@@ -250,9 +269,10 @@ struct cdf_rVDR_t
     cdf_offset_field_t<version_t> VXRtail;
     int32_t Flags;
     int32_t SRecords;
-    unused_field<int32_t> rfuB;
-    unused_field<int32_t> rfuC;
-    unused_field<std::conditional_t<is_v2_4_or_less_v<version_t>, table_field<char, 2>, int32_t>>
+    cpp_utils::serde::unused<int32_t> rfuB;
+    cpp_utils::serde::unused<int32_t> rfuC;
+    cpp_utils::serde::unused<std::conditional_t<is_v2_4_or_less_v<version_t>,
+        cpp_utils::serde::dynamic_array<9, char>, int32_t>>
         rfuF;
     int32_t NumElems;
     int32_t Num;
@@ -260,16 +280,22 @@ struct cdf_rVDR_t
     int32_t BlockingFactor;
     cdf_string_field_t<version_t, 256, 64> Name;
 
-    table_field<int32_t, 0> DimVarys;
-    table_field<int32_t, 1> PadValues;
+    cpp_utils::serde::dynamic_array<0, int32_t> DimVarys;
+    cpp_utils::serde::dynamic_array<1, int32_t> PadValues;
 
-    std::size_t size(const table_field<int32_t, 0>&, int32_t rNumDims = 0) const
+    std::size_t field_size(
+        const cpp_utils::serde::dynamic_array<0, int32_t>&, const vdr_context_t<version_t>& ctx) const
     {
-        return rNumDims * sizeof(int32_t);
+        return ctx.rNumDims;
     }
-
-    constexpr std::size_t size(const table_field<int32_t, 1>&) const { return 0; }
-    constexpr std::size_t size(const table_field<char, 2>&) const { return 132; }
+    constexpr std::size_t field_size(const cpp_utils::serde::dynamic_array<1, int32_t>&) const
+    {
+        return 0;
+    }
+    constexpr std::size_t field_size(const cpp_utils::serde::dynamic_array<9, char>&) const
+    {
+        return 132;
+    }
 };
 
 template <typename version_t>
@@ -277,6 +303,7 @@ struct cdf_zVDR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::zVDR> header;
     cdf_offset_field_t<version_t> VDRnext;
     CDF_Types DataType;
@@ -285,9 +312,10 @@ struct cdf_zVDR_t
     cdf_offset_field_t<version_t> VXRtail;
     int32_t Flags;
     int32_t SRecords;
-    unused_field<int32_t> rfuB;
-    unused_field<int32_t> rfuC;
-    unused_field<std::conditional_t<is_v2_4_or_less_v<version_t>, table_field<char, 2>, int32_t>>
+    cpp_utils::serde::unused<int32_t> rfuB;
+    cpp_utils::serde::unused<int32_t> rfuC;
+    cpp_utils::serde::unused<std::conditional_t<is_v2_4_or_less_v<version_t>,
+        cpp_utils::serde::dynamic_array<9, char>, int32_t>>
         rfuF;
     int32_t NumElems;
     int32_t Num;
@@ -295,21 +323,26 @@ struct cdf_zVDR_t
     int32_t BlockingFactor;
     cdf_string_field_t<version_t, 256, 64> Name;
     int32_t zNumDims;
-    table_field<int32_t, 0> zDimSizes;
-    table_field<int32_t, 1> DimVarys;
-    table_field<int32_t, 2> PadValues;
+    cpp_utils::serde::dynamic_array<0, int32_t> zDimSizes;
+    cpp_utils::serde::dynamic_array<1, int32_t> DimVarys;
+    cpp_utils::serde::dynamic_array<2, int32_t> PadValues;
 
-    std::size_t size(const table_field<int32_t, 0>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, int32_t>&) const
     {
-        return this->zNumDims * sizeof(int32_t);
+        return this->zNumDims;
     }
-    std::size_t size(const table_field<int32_t, 1>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<1, int32_t>&) const
     {
-        return this->zNumDims * sizeof(int32_t);
+        return this->zNumDims;
     }
-
-    constexpr std::size_t size(const table_field<int32_t, 2>&) const { return 0; }
-    constexpr std::size_t size(const table_field<char, 2>&) const { return 132; }
+    constexpr std::size_t field_size(const cpp_utils::serde::dynamic_array<2, int32_t>&) const
+    {
+        return 0;
+    }
+    constexpr std::size_t field_size(const cpp_utils::serde::dynamic_array<9, char>&) const
+    {
+        return 132;
+    }
 };
 
 template <cdf_r_z type, typename version_t>
@@ -321,25 +354,27 @@ struct cdf_VXR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::VXR> header;
     cdf_offset_field_t<version_t> VXRnext;
     uint32_t Nentries;
     uint32_t NusedEntries;
-    table_field<uint32_t, 0> First;
-    table_field<uint32_t, 1> Last;
-    table_field<cdf_offset_field_t<version_t>, 2> Offset;
+    cpp_utils::serde::dynamic_array<0, uint32_t> First;
+    cpp_utils::serde::dynamic_array<1, uint32_t> Last;
+    cpp_utils::serde::dynamic_array<2, cdf_offset_field_t<version_t>> Offset;
 
-    std::size_t size(const table_field<uint32_t, 0>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, uint32_t>&) const
     {
-        return this->Nentries * sizeof(uint32_t);
+        return this->Nentries;
     }
-    std::size_t size(const table_field<uint32_t, 1>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<1, uint32_t>&) const
     {
-        return this->Nentries * sizeof(uint32_t);
+        return this->Nentries;
     }
-    std::size_t size(const table_field<cdf_offset_field_t<version_t>, 2>&) const
+    std::size_t field_size(
+        const cpp_utils::serde::dynamic_array<2, cdf_offset_field_t<version_t>>&) const
     {
-        return this->Nentries * sizeof(cdf_offset_field_t<version_t>);
+        return this->Nentries;
     }
 };
 
@@ -348,6 +383,7 @@ struct cdf_VVR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::VVR> header;
 
     constexpr std::size_t data_size() const
@@ -361,11 +397,16 @@ struct cdf_CVVR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::CVVR> header;
-    unused_field<uint32_t> rfuA;
+    cpp_utils::serde::unused<uint32_t> rfuA;
     cdf_offset_field_t<version_t> cSize;
-    table_field<char, 0> data;
-    std::size_t size(const table_field<char, 0>&) const { return this->cSize; }
+    cpp_utils::serde::dynamic_array_bytes<0, char> data;
+
+    std::size_t field_size(const cpp_utils::serde::dynamic_array_bytes<0, char>&) const
+    {
+        return this->cSize;
+    }
 };
 
 template <typename version_t>
@@ -373,12 +414,14 @@ struct cdf_CCR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::CCR> header;
     cdf_offset_field_t<version_t> CPRoffset;
     cdf_offset_field_t<version_t> uSize;
     uint32_t rfuA;
-    table_field<char, 0> data;
-    std::size_t size(const table_field<char, 0>&) const
+    cpp_utils::serde::dynamic_array_bytes<0, char> data;
+
+    std::size_t field_size(const cpp_utils::serde::dynamic_array_bytes<0, char>&) const
     {
         return this->header.record_size - sizeof(header.record_size) - sizeof(header.record_type)
             - sizeof(CPRoffset) - sizeof(uSize) - sizeof(rfuA);
@@ -390,14 +433,16 @@ struct cdf_CPR_t
 {
     using cdf_version_t = version_t;
     inline static constexpr bool v3 = is_v3_v<version_t>;
+    using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::CPR> header;
     cdf_compression_type cType;
-    unused_field<uint32_t> rfuA;
+    cpp_utils::serde::unused<uint32_t> rfuA;
     uint32_t pCount;
-    table_field<uint32_t> cParms;
-    std::size_t size(const table_field<uint32_t, 0>&) const
+    cpp_utils::serde::dynamic_array<0, uint32_t> cParms;
+
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, uint32_t>&) const
     {
-        return this->pCount * sizeof(uint32_t);
+        return this->pCount;
     }
 };
 

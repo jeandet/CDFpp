@@ -97,8 +97,8 @@ namespace saving
             {
                 vxr.record.VXRnext = last_offset;
                 last_offset = vxr.offset;
-                std::for_each(std::rbegin(vxr.record.Offset.values),
-                    std::rend(vxr.record.Offset.values),
+                std::for_each(std::rbegin(vxr.record.Offset),
+                    std::rend(vxr.record.Offset),
                     [&last_vvr](auto& offset)
                     {
                         visit(*last_vvr,

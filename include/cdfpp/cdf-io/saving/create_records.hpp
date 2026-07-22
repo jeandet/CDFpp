@@ -32,6 +32,7 @@
 #include "cdfpp/cdf-file.hpp"
 #include "cdfpp/no_init_vector.hpp"
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <numeric>
@@ -53,7 +54,7 @@ namespace saving
                 break;
             case cdf_compression_type::gzip_compression:
                 cpr.record.pCount = 1;
-                cpr.record.cParms.values.push_back(9);
+                cpr.record.cParms.push_back(9);
                 break;
             default:
                 throw std::invalid_argument { "Unsupported compression algorithm" };
@@ -174,12 +175,12 @@ namespace saving
         }
         if (vdr.zNumDims > 0)
         {
-            vdr.zDimSizes.values.resize(vdr.zNumDims);
-            vdr.DimVarys.values.resize(vdr.zNumDims);
+            vdr.zDimSizes.resize(vdr.zNumDims);
+            vdr.DimVarys.resize(vdr.zNumDims);
             for (auto i = 0L; i < vdr.zNumDims; i++)
             {
-                vdr.zDimSizes.values[i] = variable.shape()[i + 1];
-                vdr.DimVarys.values[i] = -1;
+                vdr.zDimSizes[i] = variable.shape()[i + 1];
+                vdr.DimVarys[i] = -1;
             }
         }
         vdr.MaxRec = variable.len() - 1;
@@ -198,10 +199,12 @@ namespace saving
         else
         {
             auto cvvr = record_wrapper<cdf_CVVR_t<v3x_tag>> {};
-            cvvr.record.data.values = compression::deflate(v.compression_type(),
+            auto compressed = compression::deflate(v.compression_type(),
                 std::string_view {
                     v.bytes_ptr() + first_record * record_size, records_in_vvr * record_size });
-            cvvr.record.cSize = std::size(cvvr.record.data.values);
+            cvvr.record.data.resize(std::size(compressed));
+            std::memcpy(cvvr.record.data.data(), compressed.data(), std::size(compressed));
+            cvvr.record.cSize = std::size(cvvr.record.data);
             update_size(cvvr);
             return cvvr;
         }
@@ -267,15 +270,15 @@ namespace saving
                                 static_cast<std::size_t>(records));
                         var_ctx.values_records.emplace_back(make_values_record(
                             variable, records_in_vvr, var_record_size, first_record));
-                        vxr.record.First.values.push_back(first_record);
-                        vxr.record.Last.values.push_back(first_record + records_in_vvr - 1);
+                        vxr.record.First.push_back(first_record);
+                        vxr.record.Last.push_back(first_record + records_in_vvr - 1);
                         first_record += records_in_vvr;
                         records -= records_in_vvr;
                     }
                 }
-                vxr.record.Offset.values.resize(std::size(vxr.record.First.values));
-                vxr.record.Nentries = std::size(vxr.record.First.values);
-                vxr.record.NusedEntries = std::size(vxr.record.First.values);
+                vxr.record.Offset.resize(std::size(vxr.record.First));
+                vxr.record.Nentries = std::size(vxr.record.First);
+                vxr.record.NusedEntries = std::size(vxr.record.First);
                 update_size(vxr);
             }
             create_variable_attributes_records(var_ctx, svg_ctx);
