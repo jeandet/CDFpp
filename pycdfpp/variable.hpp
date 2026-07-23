@@ -209,7 +209,8 @@ std::pair<data_t, typename Variable::shape_t> _str_to_nd_data_t(const py::buffer
     std::copy(std::cbegin(info.shape), std::cend(info.shape), std::begin(shape));
     shape[info.ndim] = info.itemsize;
     no_init_vector<from_cdf_type_t<data_type>> values(flat_size(shape));
-    std::memcpy(values.data(), info.ptr, std::size(values));
+    if (auto size = std::size(values); size != 0)
+        std::memcpy(values.data(), info.ptr, size);
     return { data_t { std::move(values), data_type }, std::move(shape) };
 }
 
