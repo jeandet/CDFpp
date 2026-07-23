@@ -56,10 +56,10 @@ struct CDF
 {
     cdf_majority majority = cdf_majority::row;
     cdf_compression_type compression = cdf_compression_type::no_compression;
-    std::tuple<uint32_t, uint32_t, uint32_t> distribution_version = { 3, 9, 0 };
+    std::tuple<int32_t, int32_t, int32_t> distribution_version = { 3, 9, 0 };
     cdf_map<std::string, Variable> variables;
     cdf_map<std::string, Attribute> attributes;
-    uint32_t leap_second_last_updated = chrono::leap_seconds::last_updated;
+    int32_t leap_second_last_updated = chrono::leap_seconds::last_updated;
     bool lazy_loaded = false;
 
     CDF() = default;

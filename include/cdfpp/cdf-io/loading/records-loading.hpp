@@ -52,7 +52,7 @@ struct parsing_context_t
     {
     }
     inline cdf_encoding encoding() { return cdr.Encoding; }
-    inline std::tuple<uint32_t, uint32_t, uint32_t> distribution_version()
+    inline std::tuple<int32_t, int32_t, int32_t> distribution_version()
     {
         return { cdr.Version, cdr.Release, cdr.Increment };
     }
