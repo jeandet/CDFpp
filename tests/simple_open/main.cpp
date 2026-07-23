@@ -126,7 +126,7 @@ bool check_variable(const cdf::Variable& var, std::initializer_list<uint32_t> ex
     bool is_valid = compare_shape(var, expected_shape);
     auto diff = std::inner_product(std::cbegin(values), std::cend(values), std::cbegin(ref), 0.,
         std::plus<value_type>(), std::minus<value_type>());
-    is_valid &= (std::abs(diff) < 1e-9);
+    is_valid = is_valid && (std::abs(diff) < 1e-9);
     return is_valid;
 }
 
@@ -140,7 +140,7 @@ bool check_variable(
     auto ref = generator(std::size(values));
     auto diff = std::inner_product(std::cbegin(values), std::cend(values), std::cbegin(ref), 0.,
         std::plus<value_type>(), std::minus<value_type>());
-    is_valid &= (std::abs(diff) < 1e-9);
+    is_valid = is_valid && (std::abs(diff) < 1e-9);
     return is_valid;
 }
 

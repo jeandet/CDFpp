@@ -56,9 +56,9 @@ struct shared_buffer_t
     shared_buffer_t(std::shared_ptr<buffer_t>&& buffer) : p_buffer { std::move(buffer) } { }
 
     shared_buffer_t(const shared_buffer_t& other) = default;
-    shared_buffer_t(shared_buffer_t&& other) = default;
+    shared_buffer_t(shared_buffer_t&& other) noexcept = default;
     shared_buffer_t& operator=(const shared_buffer_t&) = default;
-    shared_buffer_t& operator=(shared_buffer_t&&) = default;
+    shared_buffer_t& operator=(shared_buffer_t&&) noexcept = default;
 
     auto begin() const { return p_buffer->begin(); }
     auto end() const { return p_buffer->end(); }
