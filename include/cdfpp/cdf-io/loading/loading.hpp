@@ -123,8 +123,8 @@ namespace
         }
         else // Compression was introduced in CDF V2.6
         {
-            auto parsing_ctx = make_parsing_context(
-                cdf_version_tag_t {}, std::move(buffer), cdf_compression_type::no_compression);
+            auto parsing_ctx = make_parsing_context(cdf_version_tag_t {},
+                std::forward<buffer_t>(buffer), cdf_compression_type::no_compression);
             if constexpr (!is_v3_v<cdf_version_tag_t>)
             {
                 if (parsing_ctx.cdr.Release >= 5)
@@ -160,12 +160,12 @@ namespace
         {
             if (common::is_v3x(magic))
             {
-                return parse_cdf<v3x_tag>(std::move(buffer), iso_8859_1_to_utf8_tag,
+                return parse_cdf<v3x_tag>(std::forward<buffer_t>(buffer), iso_8859_1_to_utf8_tag,
                     common::is_compressed(magic), lazy_load);
             }
             else
             {
-                return parse_cdf<v2x_tag>(std::move(buffer), iso_8859_1_to_utf8_tag,
+                return parse_cdf<v2x_tag>(std::forward<buffer_t>(buffer), iso_8859_1_to_utf8_tag,
                     common::is_compressed(magic), lazy_load);
             }
         }
@@ -176,9 +176,11 @@ namespace
     [[nodiscard]] auto impl_load(buffer_t&& buffer, bool iso_8859_1_to_utf8, bool lazy_load = false)
     {
         if (iso_8859_1_to_utf8)
-            return _impl_load(std::move(buffer), common::iso_8859_1_to_utf8_t {}, lazy_load);
+            return _impl_load(
+                std::forward<buffer_t>(buffer), common::iso_8859_1_to_utf8_t {}, lazy_load);
         else
-            return _impl_load(std::move(buffer), common::no_iso_8859_1_to_utf8_t {}, lazy_load);
+            return _impl_load(
+                std::forward<buffer_t>(buffer), common::no_iso_8859_1_to_utf8_t {}, lazy_load);
     }
 } // namespace
 

@@ -174,6 +174,40 @@ T read_be(const std::vector<char>& buffer, std::size_t offset)
     return cdf::endianness::decode<cdf::endianness::big_endian_t, T>(
         reinterpret_cast<const unsigned char*>(buffer.data() + offset));
 }
+
+struct edr_reserved_fields_check_t
+{
+    int global = 0;
+    int variable = 0;
+};
+
+// Walks the ADR linked list starting at adr, asserting every ADR.rfuE and every
+// linked AgrEDR/AzEDR's rfuD/rfuE are -1, and counts how many of each were seen.
+edr_reserved_fields_check_t check_adr_chain_reserved_fields(
+    const std::vector<char>& buffer, int64_t adr)
+{
+    edr_reserved_fields_check_t counts;
+    while (adr != 0)
+    {
+        REQUIRE(read_be<int32_t>(buffer, adr + 64) == -1); // ADR.rfuE
+        auto agr_edr_head = read_be<int64_t>(buffer, adr + 20);
+        auto az_edr_head = read_be<int64_t>(buffer, adr + 48);
+        if (agr_edr_head != 0)
+        {
+            REQUIRE(read_be<int32_t>(buffer, agr_edr_head + 48) == -1); // AgrEDR.rfuD
+            REQUIRE(read_be<int32_t>(buffer, agr_edr_head + 52) == -1); // AgrEDR.rfuE
+            counts.global++;
+        }
+        if (az_edr_head != 0)
+        {
+            REQUIRE(read_be<int32_t>(buffer, az_edr_head + 48) == -1); // AzEDR.rfuD
+            REQUIRE(read_be<int32_t>(buffer, az_edr_head + 52) == -1); // AzEDR.rfuE
+            counts.variable++;
+        }
+        adr = read_be<int64_t>(buffer, adr + 12);
+    }
+    return counts;
+}
 }
 
 SCENARIO("Reserved fields are saved as their spec-mandated sentinel value", "[CDF]")
@@ -203,28 +237,9 @@ SCENARIO("Reserved fields are saved as their spec-mandated sentinel value", "[CD
             auto gdr_offset = read_be<int64_t>(buffer, 8 + 12);
             auto adr = read_be<int64_t>(buffer, gdr_offset + 28);
             REQUIRE(adr != 0);
-            int checked_global = 0, checked_variable = 0;
-            while (adr != 0)
-            {
-                REQUIRE(read_be<int32_t>(buffer, adr + 64) == -1); // ADR.rfuE
-                auto agr_edr_head = read_be<int64_t>(buffer, adr + 20);
-                auto az_edr_head = read_be<int64_t>(buffer, adr + 48);
-                if (agr_edr_head != 0)
-                {
-                    REQUIRE(read_be<int32_t>(buffer, agr_edr_head + 48) == -1); // AgrEDR.rfuD
-                    REQUIRE(read_be<int32_t>(buffer, agr_edr_head + 52) == -1); // AgrEDR.rfuE
-                    checked_global++;
-                }
-                if (az_edr_head != 0)
-                {
-                    REQUIRE(read_be<int32_t>(buffer, az_edr_head + 48) == -1); // AzEDR.rfuD
-                    REQUIRE(read_be<int32_t>(buffer, az_edr_head + 52) == -1); // AzEDR.rfuE
-                    checked_variable++;
-                }
-                adr = read_be<int64_t>(buffer, adr + 12);
-            }
-            REQUIRE(checked_global == 1);
-            REQUIRE(checked_variable == 1);
+            auto counts = check_adr_chain_reserved_fields(buffer, adr);
+            REQUIRE(counts.global == 1);
+            REQUIRE(counts.variable == 1);
         }
     }
 }
