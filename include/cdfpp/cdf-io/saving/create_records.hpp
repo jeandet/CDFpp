@@ -88,7 +88,7 @@ namespace saving
             for (const auto& data : attribute)
             {
                 auto& aedr = fac.aedrs.emplace_back(cdf_AgrEDR_t<v3x_tag> {
-                    {}, 0, index, data.type(), value_index, 0, 0, 0, 0, 0, 0 });
+                    {}, 0, index, data.type(), value_index, 0, 0, 0, 0, -1, -1 });
                 if (is_string(data.type()))
                 {
                     aedr.record.NumStrings = visit(
@@ -125,7 +125,7 @@ namespace saving
                     + std::size(svg_ctx.body.variable_attributes);
                 svg_ctx.body.variable_attributes[name] = variable_attribute_ctx { index, {},
                     cdf_ADR_t<v3x_tag> {
-                        {}, 0, 0, cdf_attr_scope::variable, index, 0, -1, 0, 0, 0, 0, 0, { name } },
+                        {}, 0, 0, cdf_attr_scope::variable, index, 0, -1, 0, 0, 0, 0, -1, { name } },
                     {} };
             }
             auto& vac = svg_ctx.body.variable_attributes[name];
@@ -133,7 +133,7 @@ namespace saving
             vac.attrs.push_back(&attribute);
             const auto& data = *attribute;
             auto& aedr = vac.aedrs.emplace_back(cdf_AzEDR_t<v3x_tag> { {}, 0, vac.adr.record.num,
-                data.type(), static_cast<int32_t>(variable.number), 0, 0, 0, 0, 0, 0 });
+                data.type(), static_cast<int32_t>(variable.number), 0, 0, 0, 0, -1, -1 });
             if (is_string(data.type()))
             {
                 aedr.record.NumStrings = visit(

@@ -209,7 +209,7 @@ namespace saving
             svg_ctx.cpr = make_cpr(cdf.compression);
         }
         svg_ctx.body.cdr.record
-            = cdf_CDR_t<v3x_tag> { {}, 0, 3, 8, CDFpp_ENCODING, 3, 0, 0, 0, 2, 0, { R"(
+            = cdf_CDR_t<v3x_tag> { {}, 0, 3, 8, CDFpp_ENCODING, 3, 0, 0, 0, 2, -1, { R"(
 Common Data Format (CDF)\nhttps://cdf.gsfc.nasa.gov
 Space Physics Data Facility
 NASA/Goddard Space Flight Center
