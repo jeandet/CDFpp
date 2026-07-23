@@ -134,7 +134,7 @@ namespace
         const cdf_VXR_t<cdf_version_tag_t>& vxr, std::size_t record_size,
         const cdf_compression_type compression_type)
     {
-        for (auto i = 0UL; i < vxr.NusedEntries; i++)
+        for (int32_t i = 0; i < vxr.NusedEntries; i++)
         {
             int record_count = vxr.Last[i] - vxr.First[i] + 1;
 
@@ -216,7 +216,7 @@ namespace
     void count_blocks_in_vxr(stream_t& stream, const cdf_VXR_t<cdf_version_tag_t>& vxr,
         std::size_t& count, std::size_t limit)
     {
-        for (auto i = 0UL; i < vxr.NusedEntries && count < limit; i++)
+        for (int32_t i = 0; i < vxr.NusedEntries && count < limit; i++)
         {
             if (cdf_mutable_variable_record_t<cdf_version_tag_t> rec {};
                 load_mut_record(rec, stream, vxr.Offset[i]))

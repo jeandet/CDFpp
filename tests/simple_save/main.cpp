@@ -228,3 +228,30 @@ SCENARIO("Reserved fields are saved as their spec-mandated sentinel value", "[CD
         }
     }
 }
+
+SCENARIO("RLE-compressed CDFs carry a spec-conformant Compression Parameters Record",
+    "[CDF]")
+{
+    GIVEN("a whole-file RLE-compressed CDF")
+    {
+        CDF cdf_obj;
+        cdf_obj.variables.emplace("var1",
+            Variable { "var1", 0, data_t { zeros<float> {}(100), CDF_Types::CDF_FLOAT }, { 100 } });
+        cdf_obj.compression = cdf_compression_type::rle_compression;
+
+        auto saved = cdf::io::save(cdf_obj);
+        REQUIRE(std::size(saved) > 0);
+        std::vector<char> buffer(std::cbegin(saved), std::cend(saved));
+
+        THEN("the CPR's pCount is 1 and cParms[0] is 0, per the CDF Internal Format "
+             "Description's documented default for RLE (\"cParms[0] is 0\", \"pCount... "
+             "is 1\") -- an empty cParms/pCount=0 is rejected by the NASA reference "
+             "cdfvalidate tool as UNKNOWN_COMPRESSION")
+        {
+            auto cpr_offset = read_be<int64_t>(buffer, 8 + 12); // CCR.CPRoffset
+            REQUIRE(read_be<int32_t>(buffer, cpr_offset + 12) == 1); // CPR.cType == RLE
+            REQUIRE(read_be<int32_t>(buffer, cpr_offset + 20) == 1); // CPR.pCount
+            REQUIRE(read_be<int32_t>(buffer, cpr_offset + 24) == 0); // CPR.cParms[0]
+        }
+    }
+}

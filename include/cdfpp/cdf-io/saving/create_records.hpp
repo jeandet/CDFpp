@@ -51,6 +51,8 @@ namespace saving
         switch (ct)
         {
             case cdf_compression_type::rle_compression:
+                cpr.record.pCount = 1;
+                cpr.record.cParms.push_back(0);
                 break;
             case cdf_compression_type::gzip_compression:
                 cpr.record.pCount = 1;
