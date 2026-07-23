@@ -59,7 +59,15 @@ jobs:
           # every UBSan check stay fully active and are unaffected by detect_leaks — a
           # dangling pointer read through a Python wrapper (e.g. the documented nomap
           # reference-invalidation footgun) is still caught immediately.
-          export ASAN_OPTIONS=detect_leaks=0
+          #
+          # verify_asan_link_order=0 is needed because the ASan runtime reaches this
+          # process via LD_PRELOAD into an unmodified system python3, not by being
+          # linked into the main executable -- ASan's own startup link-order check
+          # doesn't expect that, and its false positive here silently breaks its
+          # __cxa_throw interception (surfacing as "CHECK failed: ...
+          # real___cxa_throw ... != 0" the moment any test actually throws a C++
+          # exception). This disables only that startup heuristic, not detection.
+          export ASAN_OPTIONS=detect_leaks=0:verify_asan_link_order=0
           export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
           meson test -C build --print-errorlogs \
             python_loading python_saving python_skeletons python_variable_set_values \
