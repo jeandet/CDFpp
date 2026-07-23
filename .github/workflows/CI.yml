@@ -108,6 +108,16 @@ jobs:
           pip install numpy pyyaml
           pip install --no-index --find-links $env:GITHUB_WORKSPACE\dist pycdfpp
       - uses: actions/checkout@v7
+      # Shared with every other job that runs tests/full_corpus (see test.py's
+      # fetch_cdf): same key everywhere so one populated cache serves them all,
+      # instead of each of this job's ~28 matrix instances re-fetching the same
+      # ~33 files from the mirror.
+      - name: Cache full_corpus fixtures
+        uses: actions/cache@v4
+        with:
+          path: tests/full_corpus/.cache
+          key: cdf-corpus-v1-${{ hashFiles('tests/full_corpus/test.py') }}
+          restore-keys: cdf-corpus-v1-
       - name: run tests
         run: |
           pip install ddt requests
@@ -140,6 +150,16 @@ jobs:
           python3 -m pip install --break-system-packages numpy pyyaml
           python3 -m pip install --break-system-packages --no-index --find-links $GITHUB_WORKSPACE/dist pycdfpp
       - uses: actions/checkout@v7
+      # Shared with every other job that runs tests/full_corpus (see test.py's
+      # fetch_cdf): same key everywhere so one populated cache serves them all,
+      # instead of each of this job's matrix instances re-fetching the same
+      # ~33 files from the mirror.
+      - name: Cache full_corpus fixtures
+        uses: actions/cache@v4
+        with:
+          path: tests/full_corpus/.cache
+          key: cdf-corpus-v1-${{ hashFiles('tests/full_corpus/test.py') }}
+          restore-keys: cdf-corpus-v1-
       - name: run tests
         run: |
           pyenv local ${{ matrix.python-version }}

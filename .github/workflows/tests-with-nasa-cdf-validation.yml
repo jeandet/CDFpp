@@ -38,6 +38,16 @@ jobs:
           path: nasa-cdf
           key: nasa-cdf-toolkit-3.9.2-${{ runner.os }}
 
+      # Shared with every other job that runs tests/full_corpus (see test.py's
+      # fetch_cdf): same key everywhere so one populated cache serves them all,
+      # instead of each job re-fetching the same ~33 files from the mirror.
+      - name: Cache full_corpus fixtures
+        uses: actions/cache@v4
+        with:
+          path: tests/full_corpus/.cache
+          key: cdf-corpus-v1-${{ hashFiles('tests/full_corpus/test.py') }}
+          restore-keys: cdf-corpus-v1-
+
       - name: Build the NASA CDF reference library (cdfvalidate) from source
         if: steps.nasa-cdf-cache.outputs.cache-hit != 'true'
         run: |
