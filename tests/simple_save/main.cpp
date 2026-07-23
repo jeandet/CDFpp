@@ -18,6 +18,7 @@
 #include "cdfpp/cdf-debug.hpp"
 #include "cdfpp/cdf-file.hpp"
 #include "cdfpp/cdf-io/cdf-io.hpp"
+#include "cdfpp/cdf-io/endianness.hpp"
 #include "cdfpp/chrono/cdf-chrono.hpp"
 #include "cdfpp/variable.hpp"
 
@@ -154,6 +155,76 @@ SCENARIO("Round-tripping real CDF fixtures through save and reload", "[CDF]")
         {
             auto [original, reloaded] = saved_and_reloaded("a_cdf_with_compressed_vars.cdf");
             REQUIRE(reloaded == original);
+        }
+    }
+}
+
+namespace
+{
+// cpp_utils::serde::unused<T>'s deserialize path discards whatever it reads into a
+// local, never writing it back to .value (see cpp_utils/serde/deserialization.hpp's
+// load_field(..., unused_field auto&)) -- so round-tripping through cdf::io::load()
+// cannot catch a wrong reserved-field default on save; only inspecting the raw
+// on-disk bytes can. Every field read here is a fixed, spec-mandated sentinel per
+// the CDF Internal Format Description (v3.9): CDR/ADR's rfuE, and AEDR's rfuD/rfuE,
+// must always be -1 (0xFFFFFFFF), regardless of attribute scope or content.
+template <typename T>
+T read_be(const std::vector<char>& buffer, std::size_t offset)
+{
+    return cdf::endianness::decode<cdf::endianness::big_endian_t, T>(
+        reinterpret_cast<const unsigned char*>(buffer.data() + offset));
+}
+}
+
+SCENARIO("Reserved fields are saved as their spec-mandated sentinel value", "[CDF]")
+{
+    GIVEN("a CDF with both a global (file) attribute and a variable attribute")
+    {
+        CDF cdf_obj;
+        cdf_obj.attributes.emplace("file_attr",
+            cdf::Attribute { "file_attr",
+                { data_t { no_init_vector<char> { 'h', 'i' }, CDF_Types::CDF_CHAR } } });
+        cdf_obj.variables.emplace("var1",
+            Variable { "var1", 0, data_t { zeros<float> {}(3), CDF_Types::CDF_FLOAT }, { 3 } });
+        cdf_obj.variables["var1"].attributes.emplace("var_attr",
+            cdf::VariableAttribute {
+                "var_attr", data_t { no_init_vector<char> { 'h', 'i' }, CDF_Types::CDF_CHAR } });
+
+        auto saved = cdf::io::save(cdf_obj);
+        REQUIRE(std::size(saved) > 0);
+        std::vector<char> buffer(std::cbegin(saved), std::cend(saved));
+
+        THEN("the CDR's rfuE is -1")
+        {
+            REQUIRE(read_be<int32_t>(buffer, 8 + 52) == -1);
+        }
+        THEN("every ADR's rfuE is -1, and every AEDR's rfuD/rfuE are -1, regardless of scope")
+        {
+            auto gdr_offset = read_be<int64_t>(buffer, 8 + 12);
+            auto adr = read_be<int64_t>(buffer, gdr_offset + 28);
+            REQUIRE(adr != 0);
+            int checked_global = 0, checked_variable = 0;
+            while (adr != 0)
+            {
+                REQUIRE(read_be<int32_t>(buffer, adr + 64) == -1); // ADR.rfuE
+                auto agr_edr_head = read_be<int64_t>(buffer, adr + 20);
+                auto az_edr_head = read_be<int64_t>(buffer, adr + 48);
+                if (agr_edr_head != 0)
+                {
+                    REQUIRE(read_be<int32_t>(buffer, agr_edr_head + 48) == -1); // AgrEDR.rfuD
+                    REQUIRE(read_be<int32_t>(buffer, agr_edr_head + 52) == -1); // AgrEDR.rfuE
+                    checked_global++;
+                }
+                if (az_edr_head != 0)
+                {
+                    REQUIRE(read_be<int32_t>(buffer, az_edr_head + 48) == -1); // AzEDR.rfuD
+                    REQUIRE(read_be<int32_t>(buffer, az_edr_head + 52) == -1); // AzEDR.rfuE
+                    checked_variable++;
+                }
+                adr = read_be<int64_t>(buffer, adr + 12);
+            }
+            REQUIRE(checked_global == 1);
+            REQUIRE(checked_variable == 1);
         }
     }
 }
