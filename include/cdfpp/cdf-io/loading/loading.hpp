@@ -35,10 +35,12 @@
 #include "cdfpp/cdf-enums.hpp"
 #include "cdfpp/cdf-file.hpp"
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <numeric>
 #include <optional>
+#include <stdexcept>
 #include <utility>
 
 namespace cdf::io
@@ -184,6 +186,8 @@ namespace
 [[nodiscard]] std::optional<CDF> load(
     const std::string& path, bool iso_8859_1_to_utf8 = true, bool lazy_load = true)
 {
+    if (std::filesystem::is_directory(path))
+        throw std::runtime_error("Cannot load a directory as a CDF file: " + path);
     auto buffer = buffers::make_shared_file_adapter(path);
     if (buffer.is_valid())
     {
