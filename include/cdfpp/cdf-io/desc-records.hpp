@@ -137,18 +137,18 @@ struct cdf_GDR_t
     cdf_offset_field_t<version_t> zVDRhead;
     cdf_offset_field_t<version_t> ADRhead;
     cdf_offset_field_t<version_t> eof;
-    uint32_t NrVars;
-    uint32_t NumAttr;
-    uint32_t rMaxRec;
-    uint32_t rNumDims;
-    uint32_t NzVars;
+    int32_t NrVars;
+    int32_t NumAttr;
+    int32_t rMaxRec;
+    int32_t rNumDims;
+    int32_t NzVars;
     cdf_offset_field_t<version_t> UIRhead;
     cpp_utils::serde::unused<int32_t> rfuC;
-    uint32_t LeapSecondLastUpdated;
+    int32_t LeapSecondLastUpdated;
     cpp_utils::serde::unused<int32_t> rfuE;
-    cpp_utils::serde::dynamic_array<0, uint32_t> rDimSizes;
+    cpp_utils::serde::dynamic_array<0, int32_t> rDimSizes;
 
-    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, uint32_t>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, int32_t>&) const
     {
         return this->rNumDims;
     }
