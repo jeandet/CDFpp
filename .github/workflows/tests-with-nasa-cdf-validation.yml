@@ -41,7 +41,14 @@ jobs:
       - name: Build the NASA CDF reference library (cdfvalidate) from source
         if: steps.nasa-cdf-cache.outputs.cache-hit != 'true'
         run: |
-          curl -sL https://spdf.gsfc.nasa.gov/pub/software/cdf/dist/cdf39_2/linux/cdf39_2-dist-all.tar.gz -o cdf.tar.gz
+          # spdf.gsfc.nasa.gov has been observed to be slow/unreliable from
+          # GitHub-hosted runners' network path even though it's fine from a
+          # regular residential/office connection -- retry with generous
+          # per-attempt timeouts rather than failing on the first hiccup.
+          curl --retry 5 --retry-delay 10 --retry-all-errors \
+            --connect-timeout 30 --max-time 180 \
+            -sL https://spdf.gsfc.nasa.gov/pub/software/cdf/dist/cdf39_2/linux/cdf39_2-dist-all.tar.gz \
+            -o cdf.tar.gz
           mkdir -p nasa-cdf
           tar xzf cdf.tar.gz -C nasa-cdf --strip-components=1
           cd nasa-cdf
