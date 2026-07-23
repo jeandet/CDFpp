@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install Python dependencies
-        run: python3.13 -m pip install meson ninja numpy meson-python>=0.14.0 build wheel
+        run: python3.13 -m pip install meson ninja numpy meson-python>=0.14.0 build wheel ddt requests
 
       - name: Configure and build CDFpp (pycdfpp is built by default)
         run: |
@@ -60,4 +60,4 @@ jobs:
           LD_LIBRARY_PATH: ${{ github.workspace }}/nasa-cdf/src/lib
           CDFVALIDATE: ${{ github.workspace }}/nasa-cdf/src/tools/cdfvalidate
         run: |
-          PYTHONPATH="$(pwd)/build" python3 tests/nasa_cdf_validation/validate.py tests/resources
+          PYTHONPATH="$(pwd)/build" python3 tests/nasa_cdf_validation/validate.py tests/resources --with-corpus
