@@ -121,7 +121,7 @@ void load_values(buffer_t& buffer, std::size_t offset, container_t& output)
 
 struct cdf_repr
 {
-    std::tuple<uint32_t, uint32_t, uint32_t> distribution_version;
+    std::tuple<int32_t, int32_t, int32_t> distribution_version;
     cdf_map<std::string, Variable> variables;
     cdf_map<std::string, Attribute> attributes;
     std::vector<cdf_map<std::string, VariableAttribute>> var_attributes;

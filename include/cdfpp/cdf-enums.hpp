@@ -143,7 +143,7 @@ enum class cdf_encoding : int32_t
     IA64VMSg = 21
 };
 
-enum class CDF_Types : uint32_t
+enum class CDF_Types : int32_t
 {
     CDF_NONE = 0,
     CDF_INT1 = 1,

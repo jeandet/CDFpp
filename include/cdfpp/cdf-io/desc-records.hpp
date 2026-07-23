@@ -112,14 +112,14 @@ struct cdf_CDR_t
     using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::CDR> header;
     cdf_offset_field_t<version_t> GDRoffset;
-    uint32_t Version;
-    uint32_t Release;
+    int32_t Version;
+    int32_t Release;
     cdf_encoding Encoding;
-    uint32_t Flags;
+    int32_t Flags;
     cpp_utils::serde::unused<int32_t> rfuA;
     cpp_utils::serde::unused<int32_t> rfuB;
-    uint32_t Increment;
-    uint32_t Identifier;
+    int32_t Increment;
+    int32_t Identifier;
     cpp_utils::serde::unused<int32_t> rfuE;
     std::conditional_t<is_v2_4_or_less_v<version_t>, cpp_utils::serde::bounded_string<1945>,
         cpp_utils::serde::bounded_string<256>>
@@ -346,17 +346,17 @@ struct cdf_VXR_t
     using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::VXR> header;
     cdf_offset_field_t<version_t> VXRnext;
-    uint32_t Nentries;
-    uint32_t NusedEntries;
-    cpp_utils::serde::dynamic_array<0, uint32_t> First;
-    cpp_utils::serde::dynamic_array<1, uint32_t> Last;
+    int32_t Nentries;
+    int32_t NusedEntries;
+    cpp_utils::serde::dynamic_array<0, int32_t> First;
+    cpp_utils::serde::dynamic_array<1, int32_t> Last;
     cpp_utils::serde::dynamic_array<2, cdf_offset_field_t<version_t>> Offset;
 
-    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, uint32_t>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, int32_t>&) const
     {
         return this->Nentries;
     }
-    std::size_t field_size(const cpp_utils::serde::dynamic_array<1, uint32_t>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<1, int32_t>&) const
     {
         return this->Nentries;
     }
@@ -388,7 +388,7 @@ struct cdf_CVVR_t
     inline static constexpr bool v3 = is_v3_v<version_t>;
     using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::CVVR> header;
-    cpp_utils::serde::unused<uint32_t> rfuA;
+    cpp_utils::serde::unused<int32_t> rfuA;
     cdf_offset_field_t<version_t> cSize;
     cpp_utils::serde::dynamic_array_bytes<0, char> data;
 
@@ -407,7 +407,7 @@ struct cdf_CCR_t
     cdf_DR_header<version_t, cdf_record_type::CCR> header;
     cdf_offset_field_t<version_t> CPRoffset;
     cdf_offset_field_t<version_t> uSize;
-    uint32_t rfuA;
+    int32_t rfuA;
     cpp_utils::serde::dynamic_array_bytes<0, char> data;
 
     std::size_t field_size(const cpp_utils::serde::dynamic_array_bytes<0, char>&) const
@@ -425,11 +425,11 @@ struct cdf_CPR_t
     using endianness = cdf_record_endianness;
     cdf_DR_header<version_t, cdf_record_type::CPR> header;
     cdf_compression_type cType;
-    cpp_utils::serde::unused<uint32_t> rfuA;
-    uint32_t pCount;
-    cpp_utils::serde::dynamic_array<0, uint32_t> cParms;
+    cpp_utils::serde::unused<int32_t> rfuA;
+    int32_t pCount;
+    cpp_utils::serde::dynamic_array<0, int32_t> cParms;
 
-    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, uint32_t>&) const
+    std::size_t field_size(const cpp_utils::serde::dynamic_array<0, int32_t>&) const
     {
         return this->pCount;
     }
