@@ -41,11 +41,19 @@ jobs:
           wacdfpp_astralint wacdfpp_diff wacdfpp_format wacdfpp_model wacdfpp_plot wacdfpp_yaml
       - name: Run Python-embedding tests under ASan+UBSan
         run: |
-          # System python3 dlopen()s the ASan-instrumented pycdfpp extension without the
-          # runtime preloaded first, which ASan refuses; resolve the real runtime path
-          # (not the linker-script stub `gcc -print-file-name=libasan.so` returns) from
-          # an already-built binary rather than hardcoding a distro-specific path.
-          export LD_PRELOAD=$(ldd build/tests/test-endianness | awk '/libasan/{print $3}')
+          # System python3 is a plain C executable with no libstdc++ dependency of its
+          # own, so at the point LD_PRELOAD libraries are loaded (before main()),
+          # libstdc++ isn't in the process yet -- it only loads later, lazily, when
+          # `import pycdfpp` dlopen()s the C++ extension. ASan's __cxa_throw
+          # interceptor resolves the real (libstdc++) implementation once, at its own
+          # init time; if libstdc++ isn't loaded yet, that resolution permanently
+          # fails (real___cxa_throw stays NULL), and the first C++ exception actually
+          # thrown anywhere in the process crashes with "CHECK failed: ...
+          # real___cxa_throw ... != 0". Preloading libstdc++ ahead of libasan forces
+          # it to already be present when ASan initializes. Resolve both paths (not
+          # the linker-script stub `gcc -print-file-name=...` returns) from an
+          # already-built binary rather than hardcoding a distro-specific path.
+          export LD_PRELOAD="$(ldd build/tests/test-endianness | awk '/libstdc\+\+/{print $3}'):$(ldd build/tests/test-endianness | awk '/libasan/{print $3}')"
           # detect_leaks=0 disables only LeakSanitizer's exit-time "still allocated"
           # scan. CPython's own interpreter/type-system caches (interned strings, type
           # dicts, frozen-module bytecode) are allocated once and intentionally kept
