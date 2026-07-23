@@ -1,0 +1,56 @@
+name: Validate output against the NASA CDF reference library
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: build the NASA CDF toolkit and validate CDFpp's output with it
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y g++
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install Python dependencies
+        run: python3.13 -m pip install meson ninja numpy meson-python>=0.14.0 build wheel
+
+      - name: Configure and build CDFpp (pycdfpp is built by default)
+        run: |
+          meson setup build
+          ninja -C build
+
+      # Cached on the pinned distribution version -- this is NASA's own reference
+      # implementation, not something we track for updates; bump the key (and the
+      # URL below) only on a deliberate version bump.
+      - name: Cache the NASA CDF reference library build
+        id: nasa-cdf-cache
+        uses: actions/cache@v4
+        with:
+          path: nasa-cdf
+          key: nasa-cdf-toolkit-3.9.2-${{ runner.os }}
+
+      - name: Build the NASA CDF reference library (cdfvalidate) from source
+        if: steps.nasa-cdf-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sL https://spdf.gsfc.nasa.gov/pub/software/cdf/dist/cdf39_2/linux/cdf39_2-dist-all.tar.gz -o cdf.tar.gz
+          mkdir -p nasa-cdf
+          tar xzf cdf.tar.gz -C nasa-cdf --strip-components=1
+          cd nasa-cdf
+          cp Makefile-classic Makefile
+          make OS=linux ENV=gnu CURSES=no SHARED=yes all
+
+      - name: Validate CDFpp-saved fixtures against the NASA reference tool
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/nasa-cdf/src/lib
+          CDFVALIDATE: ${{ github.workspace }}/nasa-cdf/src/tools/cdfvalidate
+        run: |
+          PYTHONPATH="$(pwd)/build" python3 tests/nasa_cdf_validation/validate.py tests/resources
